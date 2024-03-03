@@ -5,92 +5,49 @@ Contributing to Kalamine
 Setup
 --------------------------------------------------------------------------------
 
-After checking out the repository, you can install kalamine and its development dependencies like this:
+Install [Rust](https://www.rust-lang.org/learn/get-started).
+
+After checking out the repository, you can build kalamine with cargo:
 
 ```bash
-python3 -m pip install --user .[dev]
+cargo build
 ```
 
-Which is the equivalent of:
+To launch kalamine with cargo and pass arguments to kalamine (and not cargo) you must add `--`, for example:
 
 ```bash
-python3 -m pip install --user -e .
-python3 -m pip install --user build black isort ruff pytest mypy types-PyYAML pre-commit
-```
-
-There’s also a Makefile recipe for that:
-
-```bash
-make dev
+cargo run -- --help
 ```
 
 
 Code Formating
 --------------------------------------------------------------------------------
 
-We rely on [black][1] and [isort][2] for that, with their default configurations:
+Format with the default Rust formatter:
 
 ```bash
-black kalamine
-isort kalamine
+cargo fmt
 ```
-
-Alternative:
-
-```bash
-make format
-```
-
-[1]: https://black.readthedocs.io
-[2]: https://pycqa.github.io/isort/
 
 
 Code Linting
 --------------------------------------------------------------------------------
 
-We rely on [ruff][3] and [mypy][4] for that, with their default configurations:
+You can use clippy to help you with Rust good practices:
 
 ```bash
-black --check --quiet kalamine
-isort --check --quiet kalamine
-ruff kalamine
-mypy kalamine
+cargo clippy
 ```
-
-Alternative:
-
-```bash
-make lint
-```
-
-Many linting errors can be fixed automatically:
-
-```bash
-ruff --fix kalamine
-```
-
-[3]: https://docs.astral.sh/ruff/
-[4]: https://mypy.readthedocs.io
 
 
 Unit Tests
 --------------------------------------------------------------------------------
 
-We rely on [pytest][5] for that, but the sample layouts must be built by
-kalamine first:
+To launch tests:
 
 ```bash
-python3 -m kalamine.cli make layouts/*.toml
-pytest
+cargo test
 ```
-
-Alternative:
-
-```bash
-make test
-```
-
-[5]: https://docs.pytest.org
 
 
 Before Committing
@@ -99,14 +56,14 @@ Before Committing
 You may ensure manually that your commit will pass the Github CI (continuous integration) with:
 
 ```bash
-make
+cargo test
 ```
 
 But setting up a git pre-commit hook is strongly recommended. Just create an executable `.git/hooks/pre-commit` file containing:
 
 ```bash
 #!/bin/sh
-make
+cargo test
 ```
 
 This is asking git to run the above command before any commit is created, and to abort the commit if it fails.
