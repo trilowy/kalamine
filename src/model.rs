@@ -37,18 +37,17 @@ pub struct KeyboardLayout {
     license: String,
     version: String,
     url: String, // TODO validation
-    keys: [[Key; 4]; 6],
+
+    base_layer: Layer,
+    shif_base_layer: Option<Layer>,
+    altgr_layer: Option<Layer>,
+    shift_altgr_layer: Option<Layer>,
+    odk_layer: Option<Layer>,
+    shift_odk_layer: Option<Layer>,
 }
 
-struct Key {
-    // TODO
-    base: Option<ShiftableChar>,
-    altgr: Option<ShiftableChar>,
-    odk: Option<ShiftableChar>,
-}
+type Character = char;
 
-struct ShiftableChar {
-    // TODO
-    unshift: Option<char>,
-    shift: Option<char>,
+struct Layer {
+    keys: Vec<Vec<Option<Character>>>,
 }
