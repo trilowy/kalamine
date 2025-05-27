@@ -2,6 +2,36 @@ Contributing to Kalamine
 ================================================================================
 
 
+Zig setup
+--------------------------------------------------------------------------------
+
+### Requirements
+
+- [Zig] 0.14.1
+  - Tip: you can manage Zig versions with [zvm]
+
+
+### Run
+
+- Run with:
+  ```sh
+  zig build run
+  ```
+- Run with args (args are passed after `--`):
+  ```sh
+  zig build run -- help
+  ```
+- Run the tests with:
+  ```sh
+  zig build test
+  ```
+
+
+[Zig]: https://ziglang.org
+[zvm]: https://github.com/tristanisham/zvm
+
+
+
 Setup
 --------------------------------------------------------------------------------
 
