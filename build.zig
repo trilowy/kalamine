@@ -33,6 +33,10 @@ pub fn build(b: *std.Build) void {
         .root_module = exe_mod,
     });
 
+    // Check step for the LSP without install
+    const check = b.step("check", "Check if it compiles");
+    check.dependOn(&exe.step);
+
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
