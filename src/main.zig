@@ -1,32 +1,50 @@
 //! By convention, main.zig is where your main function lives in the case that
-//! you are building an executable. If you are making a library, the convention
-//! is to delete this file and start with root.zig instead.
+//! you are building an executable.
 
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+    // a general purpose allocator
+    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+    const allocator = debug_allocator.allocator();
+    defer _ = debug_allocator.deinit();
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
+    const stdout = std.io.getStdOut().writer();
+    const stderr = std.io.getStdErr().writer();
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    // parsing program args
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
 
-    try bw.flush(); // Don't forget to flush!
+    // must at least have one arg
+    const action = if (args.len > 1) args[1] else {
+        try stderr.print("missing arg", .{}); // TODO: print help
+        return error.MissingArg;
+    };
+
+    const cmd = std.meta.stringToEnum(Command, action) orelse {
+        try stderr.print("unknown command {s}\n", .{action}); // TODO: print help
+        return error.UnknownCommand;
+    };
+
+    switch (cmd) {
+        .build => {
+            try stdout.print("build command\n", .{});
+        },
+        .help => {
+            try stdout.print("help command\n", .{});
+        },
+    }
 }
+
+const Command = enum {
+    build,
+    help,
+};
 
 test "simple test" {
     var list = std.ArrayList(i32).init(std.testing.allocator);
     defer list.deinit(); // Try commenting this out and see if zig detects the memory leak!
     try list.append(42);
     try std.testing.expectEqual(@as(i32, 42), list.pop());
-}
-
-test "use other module" {
-    try std.testing.expectEqual(@as(i32, 150), lib.add(100, 50));
 }
 
 test "fuzz example" {
@@ -41,6 +59,3 @@ test "fuzz example" {
 }
 
 const std = @import("std");
-
-/// This imports the separate module containing `root.zig`. Take a look in `build.zig` for details.
-const lib = @import("kalamine_lib");
