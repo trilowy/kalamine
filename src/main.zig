@@ -29,15 +29,27 @@ pub fn main() !void {
         .build => {
             try stdout.print("build command\n", .{});
         },
-        .help => {
-            try stdout.print("help command\n", .{});
+        .new => {
+            try stdout.print("new command\n", .{});
+        },
+        .watch => {
+            try stdout.print("watch command\n", .{});
+        },
+        .guide => {
+            try stdout.print("guide command\n", .{});
+        },
+        .version => {
+            try stdout.print("kalamine {s}\n", .{app.version});
         },
     }
 }
 
 const Command = enum {
     build,
-    help,
+    new,
+    watch,
+    guide,
+    version,
 };
 
 test "simple test" {
@@ -59,3 +71,4 @@ test "fuzz example" {
 }
 
 const std = @import("std");
+const app = @import("build.zig.zon");
