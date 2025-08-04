@@ -3,6 +3,7 @@ use cli::ProgramArguments;
 
 mod cli;
 mod command;
+mod lexer;
 mod model;
 
 fn main() {

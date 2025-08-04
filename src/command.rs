@@ -4,24 +4,20 @@ pub fn build(layout_descriptor: String, out: OutputType, angle_mod: bool, qwerty
     // TODO: build command
     // TODO: out may be also a path to a file
     println!(
-        "build: layout_descriptor={}, out={:?}, angle_mod={}, qwerty_shortcuts={}",
-        layout_descriptor, out, angle_mod, qwerty_shortcuts
+        "build: layout_descriptor={layout_descriptor}, out={out:?}, angle_mod={angle_mod}, qwerty_shortcuts={qwerty_shortcuts}"
     );
     eprintln!("Feature not yet implemented");
 }
 
 pub fn new(output_file: String, geometry: KeyboardGeometry, altgr: bool, odk: bool) {
     // TODO: new command
-    println!(
-        "new: output_file={}, geometry={:?}, altgr={}, odk={}",
-        output_file, geometry, altgr, odk
-    );
+    println!("new: output_file={output_file}, geometry={geometry:?}, altgr={altgr}, odk={odk}");
     eprintln!("Feature not yet implemented");
 }
 
 pub fn watch(file_path: String, angle_mod: bool) {
     // TODO: watch command
-    println!("watch: file_path={}, angle_mod={}", file_path, angle_mod);
+    println!("watch: file_path={file_path}, angle_mod={angle_mod}");
     eprintln!("Feature not yet implemented");
 }
 
