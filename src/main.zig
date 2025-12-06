@@ -1,45 +1,66 @@
 //! By convention, main.zig is where your main function lives in the case that
 //! you are building an executable.
 
-pub fn main() !void {
-    // a general purpose allocator
+const std = @import("std");
+const app = @import("build.zig.zon");
+const File = std.fs.File;
+
+pub fn main() void {
+    execute() catch {
+        std.process.exit(1);
+    };
+}
+
+fn execute() !void {
     var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
     const allocator = debug_allocator.allocator();
     defer _ = debug_allocator.deinit();
 
-    const stdout = std.io.getStdOut().writer();
-    const stderr = std.io.getStdErr().writer();
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
 
-    // parsing program args
+    var stderr_buffer: [1024]u8 = undefined;
+    var stderr_writer = File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
+
+    // Parsing program args
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    // must at least have one arg
+    // Must at least have one arg
     const action = if (args.len > 1) args[1] else {
-        try stderr.print("missing arg", .{}); // TODO: print help
+        try stderr.print("Missing arg\n", .{}); // TODO: print help
+        try stderr.flush();
         return error.MissingArg;
     };
 
     const cmd = std.meta.stringToEnum(Command, action) orelse {
-        try stderr.print("unknown command {s}\n", .{action}); // TODO: print help
+        try stderr.print("Unknown command '{s}'\n", .{action}); // TODO: print help
+        try stderr.flush();
         return error.UnknownCommand;
     };
 
     switch (cmd) {
         .build => {
             try stdout.print("build command\n", .{});
+            try stdout.flush();
         },
         .new => {
             try stdout.print("new command\n", .{});
+            try stdout.flush();
         },
         .watch => {
             try stdout.print("watch command\n", .{});
+            try stdout.flush();
         },
         .guide => {
             try stdout.print("guide command\n", .{});
+            try stdout.flush();
         },
         .version => {
-            try stdout.print("kalamine {s}\n", .{app.version});
+            try stdout.print("{s}\n", .{app.version});
+            try stdout.flush();
         },
     }
 }
@@ -69,6 +90,3 @@ test "fuzz example" {
     };
     try std.testing.fuzz(Context{}, Context.testOne, .{});
 }
-
-const std = @import("std");
-const app = @import("build.zig.zon");

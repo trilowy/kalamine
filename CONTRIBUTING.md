@@ -7,7 +7,7 @@ Zig setup
 
 ### Requirements
 
-- [Zig] 0.14.1
+- [Zig] 0.15.2
   - Tip: you can manage Zig versions with [zvm]
 
 
@@ -19,11 +19,19 @@ Zig setup
   ```
 - Run with args (args are passed after `--`):
   ```sh
-  zig build run -- help
+  zig build run -- version
   ```
 - Run the tests with:
   ```sh
   zig build test
+  ```
+- Release the app:
+  ```sh
+  zig build -Doptimize=ReleaseSafe
+  ```
+- And run it:
+  ```sh
+  ./zig-out/bin/kalamine
   ```
 
 
