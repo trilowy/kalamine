@@ -2,8 +2,9 @@
 //! you are building an executable.
 
 const std = @import("std");
-const app = @import("build.zig.zon");
+const command = @import("command.zig");
 const File = std.fs.File;
+const Writer = std.Io.Writer;
 
 pub fn main() void {
     execute() catch {
@@ -35,43 +36,91 @@ fn execute() !void {
         return error.MissingArg;
     };
 
-    const cmd = std.meta.stringToEnum(Command, action) orelse {
+    if (std.mem.eql(u8, action, "build")) {
+        // TODO: Convert TOML/YAML descriptions into OS-specific keyboard drivers.
+        // @click.argument(
+        //     "layout_descriptors",
+        //     nargs=-1,
+        //     type=click.Path(exists=True, dir_okay=False, path_type=Path),
+        // )
+        // @click.option(
+        //     "--out",
+        //     default="all",
+        //     type=click.Path(),
+        //     help="Keyboard drivers to generate.",
+        // )
+        // @click.option(
+        //     "--angle-mod/--no-angle-mod",
+        //     default=False,
+        //     help="Apply Angle-Mod (which is a [ZXCVB] permutation with the LSGT key (a.k.a. ISO key))",
+        // )
+        // @click.option(
+        //     "--qwerty-shortcuts",
+        //     default=False,
+        //     is_flag=True,
+        //     help="Keep shortcuts at their qwerty location",
+        // )
+        try stdout.print("build command\n", .{});
+        try stdout.flush();
+    } else if (std.mem.eql(u8, action, "new")) {
+        // TODO: Provide geometry choices
+        // TODO: Create a new TOML layout description.
+        // @click.argument("output_file", nargs=1, type=click.Path(exists=False, path_type=Path))
+        // @click.option("--geometry", default="ISO", help="Specify keyboard geometry.")
+        // @click.option("--altgr/--no-altgr", default=False, help="Set an AltGr layer.")
+        // @click.option("--1dk/--no-1dk", "odk", default=False, help="Set a custom dead key.")
+        try stdout.print("new command\n", .{});
+        try stdout.flush();
+    } else if (std.mem.eql(u8, action, "watch")) {
+        // TODO: Watch a layout description file and display it in a web browser.
+        // @click.argument("filepath", nargs=1, type=click.Path(exists=True, path_type=Path))
+        // @click.option(
+        //     "--angle-mod/--no-angle-mod",
+        //     default=False,
+        //     help="Apply Angle-Mod (which is a [ZXCVB] permutation with the LSGT key (a.k.a. ISO key))",
+        // )
+        try stdout.print("watch command\n", .{});
+        try stdout.flush();
+    } else if (std.mem.eql(u8, action, "guide")) {
+        // TODO: Show user guide and exit.
+        // TODO: Kalamine, a keyboard layout maker
+        try stdout.print("guide command\n", .{});
+        try stdout.flush();
+    } else if (std.mem.eql(u8, action, "--version")) {
+        try command.version(stdout);
+    } else if (std.mem.eql(u8, action, "--help") or std.mem.eql(u8, action, "-h")) {
+        try stdout.print("Kalamine, a keyboard layout maker\n\n", .{});
+        try stdout.flush();
+        try usage(stdout);
+    } else {
         try stderr.print("Unknown command '{s}'\n", .{action}); // TODO: print help
         try stderr.flush();
         return error.UnknownCommand;
-    };
-
-    switch (cmd) {
-        .build => {
-            try stdout.print("build command\n", .{});
-            try stdout.flush();
-        },
-        .new => {
-            try stdout.print("new command\n", .{});
-            try stdout.flush();
-        },
-        .watch => {
-            try stdout.print("watch command\n", .{});
-            try stdout.flush();
-        },
-        .guide => {
-            try stdout.print("guide command\n", .{});
-            try stdout.flush();
-        },
-        .version => {
-            try stdout.print("{s}\n", .{app.version});
-            try stdout.flush();
-        },
     }
 }
 
-const Command = enum {
-    build,
-    new,
-    watch,
-    guide,
-    version,
-};
+fn usage(writer: *Writer) !void {
+    try writer.print(
+        \\Usage:
+        \\  kalamine build <file> [--out=(all)] [--angle-mod] [--qwerty-shortcuts] [-h | --help]
+        \\  kalamine new <output_file> [--geometry=(ISO|ANSI|ERGO)] [--altgr] [--1dk] [-h | --help]
+        \\  kalamine watch <file> [--angle-mod] [-h | --help]
+        \\  kalamine -h | --help
+        \\  kalamine --version
+        \\
+        \\Options:
+        \\  --out=(all)                 Keyboard drivers to generate, default all.
+        \\  --angle-mod                 Apply angle-mod, which is a [ZXCVB] permutation with the LSGT key (a.k.a. ISO key).
+        \\  --qwerty-shortcuts          Keep shortcuts at their Qwerty location.
+        \\  --geometry=(ISO|ANSI|ERGO)  Specify keyboard geometry, default ISO.
+        \\  --altgr                     Set an AltGr layer.
+        \\  --1dk                       Set a custom dead key.
+        \\  -h --help                   Show this screen.
+        \\  --version                   Show version.
+        \\
+    , .{});
+    try writer.flush();
+}
 
 test "simple test" {
     var list = std.ArrayList(i32).init(std.testing.allocator);
