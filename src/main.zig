@@ -31,61 +31,25 @@ fn execute() !void {
 
     // Must at least have one arg
     const action = if (args.len > 1) args[1] else {
-        try stderr.print("Missing arg\n", .{}); // TODO: print help
-        try stderr.flush();
+        try usage(stderr);
         return error.MissingArg;
     };
 
     if (std.mem.eql(u8, action, "build")) {
-        // TODO: Convert TOML/YAML descriptions into OS-specific keyboard drivers.
-        // @click.argument(
-        //     "layout_descriptors",
-        //     nargs=-1,
-        //     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-        // )
-        // @click.option(
-        //     "--out",
-        //     default="all",
-        //     type=click.Path(),
-        //     help="Keyboard drivers to generate.",
-        // )
-        // @click.option(
-        //     "--angle-mod/--no-angle-mod",
-        //     default=False,
-        //     help="Apply Angle-Mod (which is a [ZXCVB] permutation with the LSGT key (a.k.a. ISO key))",
-        // )
-        // @click.option(
-        //     "--qwerty-shortcuts",
-        //     default=False,
-        //     is_flag=True,
-        //     help="Keep shortcuts at their qwerty location",
-        // )
+        // TODO: to implement
         try stdout.print("build command\n", .{});
         try stdout.flush();
+        try command.build();
     } else if (std.mem.eql(u8, action, "new")) {
-        // TODO: Provide geometry choices
-        // TODO: Create a new TOML layout description.
-        // @click.argument("output_file", nargs=1, type=click.Path(exists=False, path_type=Path))
-        // @click.option("--geometry", default="ISO", help="Specify keyboard geometry.")
-        // @click.option("--altgr/--no-altgr", default=False, help="Set an AltGr layer.")
-        // @click.option("--1dk/--no-1dk", "odk", default=False, help="Set a custom dead key.")
+        // TODO: to implement
         try stdout.print("new command\n", .{});
         try stdout.flush();
+        try command.new();
     } else if (std.mem.eql(u8, action, "watch")) {
-        // TODO: Watch a layout description file and display it in a web browser.
-        // @click.argument("filepath", nargs=1, type=click.Path(exists=True, path_type=Path))
-        // @click.option(
-        //     "--angle-mod/--no-angle-mod",
-        //     default=False,
-        //     help="Apply Angle-Mod (which is a [ZXCVB] permutation with the LSGT key (a.k.a. ISO key))",
-        // )
+        // TODO: to implement
         try stdout.print("watch command\n", .{});
         try stdout.flush();
-    } else if (std.mem.eql(u8, action, "guide")) {
-        // TODO: Show user guide and exit.
-        // TODO: Kalamine, a keyboard layout maker
-        try stdout.print("guide command\n", .{});
-        try stdout.flush();
+        try command.watch();
     } else if (std.mem.eql(u8, action, "--version")) {
         try command.version(stdout);
     } else if (std.mem.eql(u8, action, "--help") or std.mem.eql(u8, action, "-h")) {
@@ -93,8 +57,7 @@ fn execute() !void {
         try stdout.flush();
         try usage(stdout);
     } else {
-        try stderr.print("Unknown command '{s}'\n", .{action}); // TODO: print help
-        try stderr.flush();
+        try usage(stderr);
         return error.UnknownCommand;
     }
 }

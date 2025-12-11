@@ -19,7 +19,7 @@ Zig setup
   ```
 - Run with args (args are passed after `--`):
   ```sh
-  zig build run -- version
+  zig build run -- --version
   ```
 - Run the tests with:
   ```sh
