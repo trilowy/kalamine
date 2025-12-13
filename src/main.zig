@@ -8,6 +8,7 @@ const Writer = std.Io.Writer;
 
 pub fn main() void {
     execute() catch {
+        // TODO: unknown error, message?
         std.process.exit(1);
     };
 }
@@ -29,41 +30,92 @@ fn execute() !void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    // Must at least have one arg
+    const cmd = parseCommand(args) catch |err| {
+        switch (err) {
+            error.MissingArg => {
+                try stderr.print(
+                    \\kalamine: missing arguments
+                    \\Try 'kalamine --help' for more information.
+                , .{});
+                try stderr.flush();
+            },
+            error.UnknownCommand => {
+                try stderr.print(
+                    \\kalamine: invalid argument
+                    \\Try 'kalamine --help' for more information.
+                , .{});
+                try stderr.flush();
+            },
+        }
+        return err;
+    };
+
+    switch (cmd) {
+        .build => {
+            // TODO: to implement
+            try stdout.print("build command\n", .{});
+            try stdout.flush();
+            try command.build();
+        },
+        .new => {
+            // TODO: to implement
+            try stdout.print("new command\n", .{});
+            try stdout.flush();
+            try command.new();
+        },
+        .watch => {
+            // TODO: to implement
+            try stdout.print("watch command\n", .{});
+            try stdout.flush();
+            try command.watch();
+        },
+        .version => {
+            try command.version(stdout);
+        },
+        .help => {
+            try help(stdout);
+        },
+    }
+}
+
+const Command = enum {
+    build,
+    new,
+    watch,
+    version,
+    help,
+};
+
+fn parseCommand(args: [][:0]u8) !Command {
+    // Must at least have one arg for the command
     const action = if (args.len > 1) args[1] else {
-        try usage(stderr);
         return error.MissingArg;
     };
 
     if (std.mem.eql(u8, action, "build")) {
-        // TODO: to implement
-        try stdout.print("build command\n", .{});
-        try stdout.flush();
-        try command.build();
+        // TODO: parse args
+        return .build;
     } else if (std.mem.eql(u8, action, "new")) {
-        // TODO: to implement
-        try stdout.print("new command\n", .{});
-        try stdout.flush();
-        try command.new();
+        // TODO: parse args
+        return .new;
     } else if (std.mem.eql(u8, action, "watch")) {
-        // TODO: to implement
-        try stdout.print("watch command\n", .{});
-        try stdout.flush();
-        try command.watch();
+        // TODO: parse args
+        return .watch;
     } else if (std.mem.eql(u8, action, "--version")) {
-        try command.version(stdout);
+        return .version;
     } else if (std.mem.eql(u8, action, "--help") or std.mem.eql(u8, action, "-h")) {
-        try stdout.print("Kalamine, a keyboard layout maker\n\n", .{});
-        try stdout.flush();
-        try usage(stdout);
+        // TODO: parse args
+        return .help;
     } else {
-        try usage(stderr);
         return error.UnknownCommand;
     }
 }
 
-fn usage(writer: *Writer) !void {
+// Keep this function next to command parsing to keep it up to date
+fn help(writer: *Writer) !void {
     try writer.print(
+        \\Kalamine, a keyboard layout maker
+        \\
         \\Usage:
         \\  kalamine build <file> [--out=(all)] [--angle-mod] [--qwerty-shortcuts] [-h | --help]
         \\  kalamine new <output_file> [--geometry=(ISO|ANSI|ERGO)] [--altgr] [--1dk] [-h | --help]
