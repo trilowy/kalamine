@@ -2,6 +2,108 @@ const std = @import("std");
 const app = @import("build.zig.zon");
 const Writer = std.Io.Writer;
 
+const Command = union(enum) {
+    build: BuildCommand,
+    new: NewCommand,
+    watch: WatchCommand,
+    version,
+    help: enum {
+        global,
+        build,
+        new,
+        watch,
+    },
+};
+
+const BuildCommand = struct {
+    file: []const u8,
+    out: enum { all }, // TODO: add other out options + help
+    angle_mod: bool,
+    qwerty_shortcuts: bool,
+};
+
+const NewCommand = struct {
+    output_file: []const u8,
+    geometry: enum { iso, ansi, ergo },
+    altgr: bool,
+    odk: bool,
+};
+
+const WatchCommand = struct {
+    file: []const u8,
+    angle_mod: bool,
+};
+
+pub fn parse(args: []const []const u8) !Command {
+    // Must at least have one arg for the command
+    const action = if (args.len > 1) args[1] else {
+        return error.MissingArg;
+    };
+
+    if (std.mem.eql(u8, action, "build")) {
+        // TODO: parse args
+        return Command{
+            .build = BuildCommand{
+                .file = "TODO",
+                .out = .all,
+                .angle_mod = false,
+                .qwerty_shortcuts = false,
+            },
+        };
+    } else if (std.mem.eql(u8, action, "new")) {
+        // TODO: parse args
+        return Command{
+            .new = NewCommand{
+                .output_file = "TODO",
+                .geometry = .iso,
+                .altgr = false,
+                .odk = false,
+            },
+        };
+    } else if (std.mem.eql(u8, action, "watch")) {
+        // TODO: parse args
+        return Command{
+            .watch = WatchCommand{
+                .file = "TODO",
+                .angle_mod = false,
+            },
+        };
+    } else if (std.mem.eql(u8, action, "--version")) {
+        return .version;
+    } else if (std.mem.eql(u8, action, "--help") or std.mem.eql(u8, action, "-h")) {
+        // TODO: parse args
+        return .{ .help = .global };
+    } else {
+        return error.UnknownCommand;
+    }
+}
+
+// Keep this function next to command parsing to keep it up to date
+pub fn help(writer: *Writer) !void {
+    try writer.print(
+        \\Kalamine, a keyboard layout maker
+        \\
+        \\Usage:
+        \\  kalamine build <file> [--out=(all)] [--angle-mod] [--qwerty-shortcuts] [-h | --help]
+        \\  kalamine new <output_file> [--geometry=(ISO|ANSI|ERGO)] [--altgr] [--1dk] [-h | --help]
+        \\  kalamine watch <file> [--angle-mod] [-h | --help]
+        \\  kalamine -h | --help
+        \\  kalamine --version
+        \\
+        \\Options:
+        \\  --out=(all)                 Keyboard drivers to generate, default all.
+        \\  --angle-mod                 Apply angle-mod, which is a [ZXCVB] permutation with the LSGT key (a.k.a. ISO key).
+        \\  --qwerty-shortcuts          Keep shortcuts at their Qwerty location.
+        \\  --geometry=(ISO|ANSI|ERGO)  Specify keyboard geometry, default ISO.
+        \\  --altgr                     Set an AltGr layer.
+        \\  --1dk                       Set a custom dead key.
+        \\  -h --help                   Show this screen.
+        \\  --version                   Show version.
+        \\
+    , .{});
+    try writer.flush();
+}
+
 pub fn build() !void {
     // TODO: Convert TOML/YAML descriptions into OS-specific keyboard drivers.
     // @click.argument(
@@ -50,4 +152,80 @@ pub fn watch() !void {
 pub fn version(writer: *Writer) !void {
     try writer.print("{s}\n", .{app.version});
     try writer.flush();
+}
+
+test "parse missing arg" {
+    const args = [_][:0]const u8{"kalamine"};
+    const result = parse(&args);
+    try std.testing.expectEqual(error.MissingArg, result);
+}
+
+test "parse build" {
+    const args = [_][:0]const u8{ "kalamine", "build" };
+    const result = parse(&args);
+    try std.testing.expectEqual(
+        Command{
+            .build = BuildCommand{
+                .file = "TODO",
+                .out = .all,
+                .angle_mod = false,
+                .qwerty_shortcuts = false,
+            },
+        },
+        result,
+    );
+}
+
+test "parse new" {
+    const args = [_][:0]const u8{ "kalamine", "new" };
+    const result = parse(&args);
+    try std.testing.expectEqual(
+        Command{
+            .new = NewCommand{
+                .output_file = "TODO",
+                .geometry = .iso,
+                .altgr = false,
+                .odk = false,
+            },
+        },
+        result,
+    );
+}
+
+test "parse watch" {
+    const args = [_][:0]const u8{ "kalamine", "watch" };
+    const result = parse(&args);
+    try std.testing.expectEqual(
+        Command{
+            .watch = WatchCommand{
+                .file = "TODO",
+                .angle_mod = false,
+            },
+        },
+        result,
+    );
+}
+
+test "parse --version" {
+    const args = [_][:0]const u8{ "kalamine", "--version" };
+    const result = parse(&args);
+    try std.testing.expectEqual(.version, result);
+}
+
+test "parse --help" {
+    const args = [_][:0]const u8{ "kalamine", "--help" };
+    const result = parse(&args);
+    try std.testing.expectEqual(Command{ .help = .global }, result);
+}
+
+test "parse -h" {
+    const args = [_][:0]const u8{ "kalamine", "-h" };
+    const result = parse(&args);
+    try std.testing.expectEqual(Command{ .help = .global }, result);
+}
+
+test "parse unknown" {
+    const args = [_][:0]const u8{ "kalamine", "unknown" };
+    const result = parse(&args);
+    try std.testing.expectEqual(error.UnknownCommand, result);
 }
