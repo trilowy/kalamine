@@ -34,15 +34,17 @@ fn execute() !void {
         switch (err) {
             error.MissingArg => {
                 try stderr.print(
-                    \\kalamine: missing arguments
+                    \\kalamine: missing option
                     \\Try 'kalamine --help' for more information.
+                    \\
                 , .{});
                 try stderr.flush();
             },
             error.UnknownCommand => {
                 try stderr.print(
-                    \\kalamine: invalid argument
+                    \\kalamine: invalid option
                     \\Try 'kalamine --help' for more information.
+                    \\
                 , .{});
                 try stderr.flush();
             },
@@ -86,7 +88,7 @@ const Command = enum {
     help,
 };
 
-fn parseCommand(args: [][:0]u8) !Command {
+fn parseCommand(args: []const []const u8) !Command {
     // Must at least have one arg for the command
     const action = if (args.len > 1) args[1] else {
         return error.MissingArg;
@@ -137,20 +139,50 @@ fn help(writer: *Writer) !void {
     try writer.flush();
 }
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // Try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+test "parseCommand missing arg" {
+    const args = [_][:0]const u8{"kalamine"};
+    const result = parseCommand(&args);
+    try std.testing.expectEqual(error.MissingArg, result);
 }
 
-test "fuzz example" {
-    const Context = struct {
-        fn testOne(context: @This(), input: []const u8) anyerror!void {
-            _ = context;
-            // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!
-            try std.testing.expect(!std.mem.eql(u8, "canyoufindme", input));
-        }
-    };
-    try std.testing.fuzz(Context{}, Context.testOne, .{});
+test "parseCommand build" {
+    const args = [_][:0]const u8{ "kalamine", "build" };
+    const result = parseCommand(&args);
+    try std.testing.expectEqual(.build, result);
+}
+
+test "parseCommand new" {
+    const args = [_][:0]const u8{ "kalamine", "new" };
+    const result = parseCommand(&args);
+    try std.testing.expectEqual(.new, result);
+}
+
+test "parseCommand watch" {
+    const args = [_][:0]const u8{ "kalamine", "watch" };
+    const result = parseCommand(&args);
+    try std.testing.expectEqual(.watch, result);
+}
+
+test "parseCommand --version" {
+    const args = [_][:0]const u8{ "kalamine", "--version" };
+    const result = parseCommand(&args);
+    try std.testing.expectEqual(.version, result);
+}
+
+test "parseCommand --help" {
+    const args = [_][:0]const u8{ "kalamine", "--help" };
+    const result = parseCommand(&args);
+    try std.testing.expectEqual(.help, result);
+}
+
+test "parseCommand -h" {
+    const args = [_][:0]const u8{ "kalamine", "-h" };
+    const result = parseCommand(&args);
+    try std.testing.expectEqual(.help, result);
+}
+
+test "parseCommand unknown" {
+    const args = [_][:0]const u8{ "kalamine", "unknown" };
+    const result = parseCommand(&args);
+    try std.testing.expectEqual(error.UnknownCommand, result);
 }
