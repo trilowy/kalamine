@@ -74,8 +74,8 @@ fn execute() !void {
         .version => {
             try command.version(stdout);
         },
-        .help => {
-            try command.help(stdout);
+        .help => |help_command| {
+            try help_command.print(stdout);
         },
     }
 }
