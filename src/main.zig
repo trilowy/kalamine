@@ -82,5 +82,5 @@ fn execute() !void {
 
 // Run all tests of all modules
 test {
-    std.testing.refAllDecls(@This());
+    _ = @import("command.zig");
 }

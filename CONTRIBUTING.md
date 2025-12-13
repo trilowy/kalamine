@@ -23,7 +23,7 @@ Zig setup
   ```
 - Run the tests with:
   ```sh
-  zig build test
+  zig build test --summary all
   ```
 - Release the app:
   ```sh
