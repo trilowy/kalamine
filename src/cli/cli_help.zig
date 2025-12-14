@@ -15,21 +15,23 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
                 \\
                 \\Usage:
                 \\  kalamine build <file> [--out=(all)] [--angle-mod] [--qwerty-shortcuts] [-h | --help]
-                \\  kalamine new <output_file> [--geometry=(ISO|ANSI|ERGO)] [--altgr] [--1dk] [-h | --help]
+                \\  kalamine new <output_file> [--geometry=(ISO)] [--altgr] [--1dk] [-h | --help]
                 \\  kalamine watch <file> [--angle-mod] [-h | --help]
                 \\  kalamine -h | --help
                 \\  kalamine --version
                 \\
                 \\Options:
                 \\  --out=(all|keylayout|klc|xkb_keymap|xkb_symbols|svg)
-                \\                              Keyboard drivers to generate, default all.
-                \\  --angle-mod                 Apply angle-mod, which is a [ZXCVB] permutation with the LSGT key (a.k.a. ISO key).
-                \\  --qwerty-shortcuts          Keep shortcuts at their Qwerty location.
-                \\  --geometry=(ISO|ANSI|ERGO)  Specify keyboard geometry, default ISO.
-                \\  --altgr                     Set an AltGr layer.
-                \\  --1dk                       Set a custom dead key.
-                \\  -h --help                   Show this screen.
-                \\  --version                   Show version.
+                \\                      Keyboard drivers to generate, default all.
+                \\  --angle-mod         Apply angle-mod, which is a [ZXCVB] permutation with the
+                \\                      LSGT key (a.k.a. ISO key).
+                \\  --qwerty-shortcuts  Keep shortcuts at their Qwerty location.
+                \\  --geometry=(ISO|ANSI|ERGO|ABNT|JIS|ALT)
+                \\                      Specify keyboard geometry, default ISO.
+                \\  --altgr             Set an AltGr layer.
+                \\  --1dk               Set a custom dead key.
+                \\  -h --help           Show this screen.
+                \\  --version           Show version.
                 \\
             , .{});
         },
@@ -43,7 +45,8 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
                 \\Options:
                 \\  --out=(all|keylayout|klc|xkb_keymap|xkb_symbols|svg)
                 \\                      Keyboard drivers to generate, default all.
-                \\  --angle-mod         Apply angle-mod, which is a [ZXCVB] permutation with the LSGT key (a.k.a. ISO key).
+                \\  --angle-mod         Apply angle-mod, which is a [ZXCVB] permutation with the
+                \\                      LSGT key (a.k.a. ISO key).
                 \\  --qwerty-shortcuts  Keep shortcuts at their Qwerty location.
                 \\  -h --help           Show this screen.
                 \\
@@ -54,13 +57,14 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
                 \\Create a new TOML layout description.
                 \\
                 \\Usage:
-                \\  kalamine new <output_file> [--geometry=(ISO|ANSI|ERGO)] [--altgr] [--1dk] [-h | --help]
+                \\  kalamine new <output_file> [--geometry=(ISO)] [--altgr] [--1dk] [-h | --help]
                 \\
                 \\Options:
-                \\  --geometry=(ISO|ANSI|ERGO)  Specify keyboard geometry, default ISO.
-                \\  --altgr                     Set an AltGr layer.
-                \\  --1dk                       Set a custom dead key.
-                \\  -h --help                   Show this screen.
+                \\  --geometry=(ISO|ANSI|ERGO|ABNT|JIS|ALT)
+                \\             Specify keyboard geometry, default ISO.
+                \\  --altgr    Set an AltGr layer.
+                \\  --1dk      Set a custom dead key.
+                \\  -h --help  Show this screen.
                 \\
             , .{});
         },
@@ -72,7 +76,8 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
                 \\  kalamine watch <file> [--angle-mod] [-h | --help]
                 \\
                 \\Options:
-                \\  --angle-mod  Apply angle-mod, which is a [ZXCVB] permutation with the LSGT key (a.k.a. ISO key).
+                \\  --angle-mod  Apply angle-mod, which is a [ZXCVB] permutation with the LSGT key
+                \\               (a.k.a. ISO key).
                 \\  -h --help    Show this screen.
                 \\
             , .{});

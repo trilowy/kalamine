@@ -92,4 +92,5 @@ fn execute() !void {
 test {
     _ = @import("cli/cli.zig");
     _ = @import("cli/build_parser.zig");
+    _ = @import("cli/new_parser.zig");
 }

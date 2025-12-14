@@ -1,8 +1,17 @@
 pub const Options = struct {
     output_file: []const u8,
-    geometry: enum { iso, ansi, ergo },
+    geometry: Geometry,
     altgr: bool,
     odk: bool,
+};
+
+pub const Geometry = enum {
+    iso,
+    ansi,
+    ergo,
+    abnt,
+    jis,
+    alt,
 };
 
 pub fn run() !void {

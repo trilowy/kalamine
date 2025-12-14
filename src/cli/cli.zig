@@ -93,16 +93,16 @@ test "parse build --help with to many arg" {
     try std.testing.expectEqual(CliError.DuplicatedArg, result);
 }
 
-test "parse new" {
-    const args = [_][]const u8{ "kalamine", "new" };
+test "parse new all args" {
+    const args = [_][]const u8{ "kalamine", "new", "/test/file", "--altgr", "--1dk", "--geometry=ISO" };
     const result = parse(&args);
     try std.testing.expectEqual(
         Command{
             .new = new.Options{
-                .output_file = "TODO",
+                .output_file = "/test/file",
                 .geometry = .iso,
-                .altgr = false,
-                .odk = false,
+                .altgr = true,
+                .odk = true,
             },
         },
         result,
@@ -121,18 +121,17 @@ test "parse new --help" {
     try std.testing.expectEqual(Command{ .help = .new }, result);
 }
 
-// TODO: uncomment when parsing is done
-// test "parse new -h with to many arg" {
-//     const args = [_][]const u8{ "kalamine", "new", "-h", "wrong" };
-//     const result = parse(&args);
-//     try std.testing.expectEqual(CliError.DuplicatedArg, result);
-// }
-//
-// test "parse new --help with to many arg" {
-//     const args = [_][]const u8{ "kalamine", "new", "--help", "wrong" };
-//     const result = parse(&args);
-//     try std.testing.expectEqual(CliError.DuplicatedArg, result);
-// }
+test "parse new -h with to many arg" {
+    const args = [_][]const u8{ "kalamine", "new", "-h", "wrong" };
+    const result = parse(&args);
+    try std.testing.expectEqual(CliError.DuplicatedArg, result);
+}
+
+test "parse new --help with to many arg" {
+    const args = [_][]const u8{ "kalamine", "new", "--help", "wrong" };
+    const result = parse(&args);
+    try std.testing.expectEqual(CliError.DuplicatedArg, result);
+}
 
 test "parse watch" {
     const args = [_][]const u8{ "kalamine", "watch" };
