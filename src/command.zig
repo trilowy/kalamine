@@ -173,6 +173,9 @@ fn parseBuild(args: []const []const u8) !Command {
         } else if (std.mem.startsWith(u8, arg, "--out=")) {
             const out_value = arg["--out=".len..];
             if (std.mem.eql(u8, out_value, "all")) {
+                if (out != null) {
+                    return error.DuplicatedArg;
+                }
                 out = .all;
             } else {
                 return error.WrongArgValue;
@@ -259,18 +262,54 @@ pub fn version(writer: *Writer) !void {
 }
 
 test "parse missing arg" {
-    const args = [_][:0]const u8{"kalamine"};
+    const args = [_][]const u8{"kalamine"};
     const result = parse(&args);
     try std.testing.expectEqual(error.MissingArg, result);
 }
 
-test "parse build" {
-    const args = [_][:0]const u8{ "kalamine", "build" };
+test "parse build no arg" {
+    const args = [_][]const u8{ "kalamine", "build" };
+    const result = parse(&args);
+    try std.testing.expectEqual(error.MissingArg, result);
+}
+
+test "parse build no file" {
+    const args = [_][]const u8{ "kalamine", "build", "--angle-mod" };
+    const result = parse(&args);
+    try std.testing.expectEqual(error.MissingArg, result);
+}
+
+test "parse build duplicated --angle-mod" {
+    const args = [_][]const u8{ "kalamine", "build", "--angle-mod", "/test/file", "--angle-mod" };
+    const result = parse(&args);
+    try std.testing.expectEqual(error.DuplicatedArg, result);
+}
+
+test "parse build duplicated --qwerty-shortcuts" {
+    const args = [_][]const u8{ "kalamine", "build", "--qwerty-shortcuts", "/test/file", "--qwerty-shortcuts" };
+    const result = parse(&args);
+    try std.testing.expectEqual(error.DuplicatedArg, result);
+}
+
+test "parse build duplicated --out" {
+    const args = [_][]const u8{ "kalamine", "build", "--out=all", "/test/file", "--out=all" };
+    const result = parse(&args);
+    try std.testing.expectEqual(error.DuplicatedArg, result);
+}
+
+test "parse build wrong --out value" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=wrong" };
+    const result = parse(&args);
+    try std.testing.expectEqual(error.WrongArgValue, result);
+}
+
+test "parse build file" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file" };
     const result = parse(&args);
     try std.testing.expectEqual(
         Command{
             .build = BuildCommand{
-                .file = "TODO",
+                .file = "/test/file",
                 .out = .all,
                 .angle_mod = false,
                 .qwerty_shortcuts = false,
@@ -280,8 +319,88 @@ test "parse build" {
     );
 }
 
+test "parse build file --angle-mod" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--angle-mod" };
+    const result = parse(&args);
+    try std.testing.expectEqual(
+        Command{
+            .build = BuildCommand{
+                .file = "/test/file",
+                .out = .all,
+                .angle_mod = true,
+                .qwerty_shortcuts = false,
+            },
+        },
+        result,
+    );
+}
+
+test "parse build file --qwerty-shortcuts" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--qwerty-shortcuts" };
+    const result = parse(&args);
+    try std.testing.expectEqual(
+        Command{
+            .build = BuildCommand{
+                .file = "/test/file",
+                .out = .all,
+                .angle_mod = false,
+                .qwerty_shortcuts = true,
+            },
+        },
+        result,
+    );
+}
+
+test "parse build file --out=all" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=all" };
+    const result = parse(&args);
+    try std.testing.expectEqual(
+        Command{
+            .build = BuildCommand{
+                .file = "/test/file",
+                .out = .all,
+                .angle_mod = false,
+                .qwerty_shortcuts = false,
+            },
+        },
+        result,
+    );
+}
+
+test "parse build file all args" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--angle-mod", "--qwerty-shortcuts", "--out=all" };
+    const result = parse(&args);
+    try std.testing.expectEqual(
+        Command{
+            .build = BuildCommand{
+                .file = "/test/file",
+                .out = .all,
+                .angle_mod = true,
+                .qwerty_shortcuts = true,
+            },
+        },
+        result,
+    );
+}
+
+test "parse build file all args in another order" {
+    const args = [_][]const u8{ "kalamine", "build", "--out=all", "--angle-mod", "/test/file", "--qwerty-shortcuts" };
+    const result = parse(&args);
+    try std.testing.expectEqual(
+        Command{
+            .build = BuildCommand{
+                .file = "/test/file",
+                .out = .all,
+                .angle_mod = true,
+                .qwerty_shortcuts = true,
+            },
+        },
+        result,
+    );
+}
+
 test "parse new" {
-    const args = [_][:0]const u8{ "kalamine", "new" };
+    const args = [_][]const u8{ "kalamine", "new" };
     const result = parse(&args);
     try std.testing.expectEqual(
         Command{
@@ -297,7 +416,7 @@ test "parse new" {
 }
 
 test "parse watch" {
-    const args = [_][:0]const u8{ "kalamine", "watch" };
+    const args = [_][]const u8{ "kalamine", "watch" };
     const result = parse(&args);
     try std.testing.expectEqual(
         Command{
@@ -311,25 +430,25 @@ test "parse watch" {
 }
 
 test "parse --version" {
-    const args = [_][:0]const u8{ "kalamine", "--version" };
+    const args = [_][]const u8{ "kalamine", "--version" };
     const result = parse(&args);
     try std.testing.expectEqual(.version, result);
 }
 
 test "parse --help" {
-    const args = [_][:0]const u8{ "kalamine", "--help" };
+    const args = [_][]const u8{ "kalamine", "--help" };
     const result = parse(&args);
     try std.testing.expectEqual(Command{ .help = .global }, result);
 }
 
 test "parse -h" {
-    const args = [_][:0]const u8{ "kalamine", "-h" };
+    const args = [_][]const u8{ "kalamine", "-h" };
     const result = parse(&args);
     try std.testing.expectEqual(Command{ .help = .global }, result);
 }
 
 test "parse unknown" {
-    const args = [_][:0]const u8{ "kalamine", "unknown" };
+    const args = [_][]const u8{ "kalamine", "unknown" };
     const result = parse(&args);
     try std.testing.expectEqual(error.UnknownCommand, result);
 }

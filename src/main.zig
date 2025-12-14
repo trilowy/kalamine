@@ -38,7 +38,6 @@ fn execute() !void {
                     \\Try 'kalamine --help' for more information.
                     \\
                 , .{});
-                try stderr.flush();
             },
             error.UnknownCommand,
             error.WrongArgValue,
@@ -48,13 +47,12 @@ fn execute() !void {
                     \\Try 'kalamine --help' for more information.
                     \\
                 , .{});
-                try stderr.flush();
             },
             error.DuplicatedArg => {
                 try stderr.print("kalamine: duplicated option\n", .{});
-                try stderr.flush();
             },
         }
+        try stderr.flush();
         return err;
     };
 
