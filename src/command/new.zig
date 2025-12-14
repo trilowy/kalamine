@@ -14,7 +14,7 @@ pub const Geometry = enum {
     alt,
 };
 
-pub fn run() !void {
+pub fn run(_: Options) !void {
     // TODO: Provide geometry choices
     // TODO: Create a new TOML layout description.
     // @click.argument("output_file", nargs=1, type=click.Path(exists=False, path_type=Path))

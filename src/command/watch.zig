@@ -3,7 +3,7 @@ pub const Options = struct {
     angle_mod: bool,
 };
 
-pub fn run() !void {
+pub fn run(_: Options) !void {
     // TODO: Watch a layout description file and display it in a web browser.
     // @click.argument("filepath", nargs=1, type=click.Path(exists=True, path_type=Path))
     // @click.option(

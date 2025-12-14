@@ -67,17 +67,17 @@ fn execute() !void {
             try stdout.flush();
             try build.run(options);
         },
-        .new => {
+        .new => |options| {
             // TODO: to implement
             try stdout.print("new command not yet implemented\n", .{});
             try stdout.flush();
-            try new.run();
+            try new.run(options);
         },
-        .watch => {
+        .watch => |options| {
             // TODO: to implement
             try stdout.print("watch command not yet implemented\n", .{});
             try stdout.flush();
-            try watch.run();
+            try watch.run(options);
         },
         .version => {
             try version.printTo(stdout);
@@ -93,4 +93,5 @@ test {
     _ = @import("cli/cli.zig");
     _ = @import("cli/build_parser.zig");
     _ = @import("cli/new_parser.zig");
+    _ = @import("cli/watch_parser.zig");
 }

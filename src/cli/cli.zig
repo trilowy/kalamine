@@ -133,14 +133,14 @@ test "parse new --help with to many arg" {
     try std.testing.expectEqual(CliError.DuplicatedArg, result);
 }
 
-test "parse watch" {
-    const args = [_][]const u8{ "kalamine", "watch" };
+test "parse watch all args" {
+    const args = [_][]const u8{ "kalamine", "watch", "/test/file", "--angle-mod" };
     const result = parse(&args);
     try std.testing.expectEqual(
         Command{
             .watch = watch.Options{
-                .file = "TODO",
-                .angle_mod = false,
+                .file = "/test/file",
+                .angle_mod = true,
             },
         },
         result,
@@ -159,18 +159,17 @@ test "parse watch --help" {
     try std.testing.expectEqual(Command{ .help = .watch }, result);
 }
 
-// TODO: uncomment when parsing is done
-// test "parse watch -h with to many arg" {
-//     const args = [_][]const u8{ "kalamine", "watch", "-h", "wrong" };
-//     const result = parse(&args);
-//     try std.testing.expectEqual(CliError.DuplicatedArg, result);
-// }
-//
-// test "parse watch --help with to many arg" {
-//     const args = [_][]const u8{ "kalamine", "watch", "--help", "wrong" };
-//     const result = parse(&args);
-//     try std.testing.expectEqual(CliError.DuplicatedArg, result);
-// }
+test "parse watch -h with to many arg" {
+    const args = [_][]const u8{ "kalamine", "watch", "-h", "wrong" };
+    const result = parse(&args);
+    try std.testing.expectEqual(CliError.DuplicatedArg, result);
+}
+
+test "parse watch --help with to many arg" {
+    const args = [_][]const u8{ "kalamine", "watch", "--help", "wrong" };
+    const result = parse(&args);
+    try std.testing.expectEqual(CliError.DuplicatedArg, result);
+}
 
 test "parse --version" {
     const args = [_][]const u8{ "kalamine", "--version" };
