@@ -12,10 +12,12 @@ const Command = union(enum) {
 
 const BuildCommand = struct {
     file: []const u8,
-    out: enum { all }, // TODO: add other out options + help
+    out: BuildCommandOut,
     angle_mod: bool,
     qwerty_shortcuts: bool,
 };
+
+const BuildCommandOut = enum { all }; // TODO: add other out options + help
 
 const NewCommand = struct {
     output_file: []const u8,
@@ -36,7 +38,7 @@ const HelpCommand = enum {
     watch,
 
     // Keep this function next to command parsing to keep it up to date
-    pub fn print(self: HelpCommand, writer: *Writer) !void {
+    pub fn printTo(self: HelpCommand, writer: *Writer) !void {
         switch (self) {
             .global => {
                 try writer.print(
@@ -116,15 +118,7 @@ pub fn parse(args: []const []const u8) !Command {
     };
 
     if (std.mem.eql(u8, action, "build")) {
-        // TODO: parse args
-        return Command{
-            .build = BuildCommand{
-                .file = "TODO",
-                .out = .all,
-                .angle_mod = false,
-                .qwerty_shortcuts = false,
-            },
-        };
+        return parseBuild(args[2..]);
     } else if (std.mem.eql(u8, action, "new")) {
         // TODO: parse args
         return Command{
@@ -151,6 +145,67 @@ pub fn parse(args: []const []const u8) !Command {
     } else {
         return error.UnknownCommand;
     }
+}
+
+// TODO: test
+fn parseBuild(args: []const []const u8) !Command {
+    // Must at least have one arg
+    if (args.len == 0) {
+        return error.MissingArg;
+    }
+
+    var file: ?[]const u8 = null;
+    var out: ?BuildCommandOut = null;
+    var angle_mod: ?bool = null;
+    var qwerty_shortcuts: ?bool = null;
+
+    for (args) |arg| {
+        if (std.mem.eql(u8, arg, "--angle-mod")) {
+            if (angle_mod != null) {
+                return error.DuplicatedArg;
+            }
+            angle_mod = true;
+        } else if (std.mem.eql(u8, arg, "--qwerty-shortcuts")) {
+            if (qwerty_shortcuts != null) {
+                return error.DuplicatedArg;
+            }
+            qwerty_shortcuts = true;
+        } else if (std.mem.startsWith(u8, arg, "--out=")) {
+            const out_value = arg["--out=".len..];
+            if (std.mem.eql(u8, out_value, "all")) {
+                out = .all;
+            } else {
+                return error.WrongArgValue;
+            }
+        } else {
+            if (file != null) {
+                return error.DuplicatedArg;
+            }
+            file = arg;
+        }
+    }
+
+    if (file == null) {
+        return error.MissingArg;
+    }
+    if (out == null) {
+        out = .all;
+    }
+    if (angle_mod == null) {
+        angle_mod = false;
+    }
+    if (qwerty_shortcuts == null) {
+        qwerty_shortcuts = false;
+    }
+
+    return Command{
+        .build = BuildCommand{
+            .file = file.?,
+            .out = out.?,
+            .angle_mod = angle_mod.?,
+            .qwerty_shortcuts = qwerty_shortcuts.?,
+        },
+    };
 }
 
 pub fn build() !void {

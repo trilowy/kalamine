@@ -40,12 +40,18 @@ fn execute() !void {
                 , .{});
                 try stderr.flush();
             },
-            error.UnknownCommand => {
+            error.UnknownCommand,
+            error.WrongArgValue,
+            => {
                 try stderr.print(
                     \\kalamine: invalid option
                     \\Try 'kalamine --help' for more information.
                     \\
                 , .{});
+                try stderr.flush();
+            },
+            error.DuplicatedArg => {
+                try stderr.print("kalamine: duplicated option\n", .{});
                 try stderr.flush();
             },
         }
@@ -75,7 +81,7 @@ fn execute() !void {
             try command.version(stdout);
         },
         .help => |help_command| {
-            try help_command.print(stdout);
+            try help_command.printTo(stdout);
         },
     }
 }
