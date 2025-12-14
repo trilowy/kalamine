@@ -12,7 +12,6 @@ const CliError = @import("cli/error.zig").CliError;
 
 pub fn main() void {
     execute() catch {
-        // TODO: unknown error, message?
         std.process.exit(1);
     };
 }
@@ -65,19 +64,19 @@ fn execute() !void {
             // TODO: to implement
             try stdout.print("build command not yet implemented\n", .{});
             try stdout.flush();
-            try build.run(options);
+            try build.run(options); // TODO: handle error
         },
         .new => |options| {
             // TODO: to implement
             try stdout.print("new command not yet implemented\n", .{});
             try stdout.flush();
-            try new.run(options);
+            try new.run(options); // TODO: handle error
         },
         .watch => |options| {
             // TODO: to implement
             try stdout.print("watch command not yet implemented\n", .{});
             try stdout.flush();
-            try watch.run(options);
+            try watch.run(options); // TODO: handle error
         },
         .version => {
             try version.printTo(stdout);
