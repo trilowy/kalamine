@@ -17,7 +17,14 @@ const BuildCommand = struct {
     qwerty_shortcuts: bool,
 };
 
-const BuildCommandOut = enum { all }; // TODO: add other out options + help
+const BuildCommandOut = enum {
+    all,
+    keylayout,
+    klc,
+    xkb_keymap,
+    xkb_symbols,
+    svg,
+};
 
 const NewCommand = struct {
     output_file: []const u8,
@@ -52,7 +59,8 @@ const HelpCommand = enum {
                     \\  kalamine --version
                     \\
                     \\Options:
-                    \\  --out=(all)                 Keyboard drivers to generate, default all.
+                    \\  --out=(all|keylayout|klc|xkb_keymap|xkb_symbols|svg)
+                    \\                              Keyboard drivers to generate, default all.
                     \\  --angle-mod                 Apply angle-mod, which is a [ZXCVB] permutation with the LSGT key (a.k.a. ISO key).
                     \\  --qwerty-shortcuts          Keep shortcuts at their Qwerty location.
                     \\  --geometry=(ISO|ANSI|ERGO)  Specify keyboard geometry, default ISO.
@@ -71,7 +79,8 @@ const HelpCommand = enum {
                     \\  kalamine build <file> [--out=(all)] [--angle-mod] [--qwerty-shortcuts] [-h | --help]
                     \\
                     \\Options:
-                    \\  --out=(all)         Keyboard drivers to generate, default all.
+                    \\  --out=(all|keylayout|klc|xkb_keymap|xkb_symbols|svg)
+                    \\                      Keyboard drivers to generate, default all.
                     \\  --angle-mod         Apply angle-mod, which is a [ZXCVB] permutation with the LSGT key (a.k.a. ISO key).
                     \\  --qwerty-shortcuts  Keep shortcuts at their Qwerty location.
                     \\  -h --help           Show this screen.
@@ -172,11 +181,21 @@ fn parseBuild(args: []const []const u8) !Command {
             qwerty_shortcuts = true;
         } else if (std.mem.startsWith(u8, arg, "--out=")) {
             const out_value = arg["--out=".len..];
+            if (out != null) {
+                return error.DuplicatedArg;
+            }
             if (std.mem.eql(u8, out_value, "all")) {
-                if (out != null) {
-                    return error.DuplicatedArg;
-                }
                 out = .all;
+            } else if (std.mem.eql(u8, out_value, "keylayout")) {
+                out = .keylayout;
+            } else if (std.mem.eql(u8, out_value, "klc")) {
+                out = .klc;
+            } else if (std.mem.eql(u8, out_value, "xkb_keymap")) {
+                out = .xkb_keymap;
+            } else if (std.mem.eql(u8, out_value, "xkb_symbols")) {
+                out = .xkb_symbols;
+            } else if (std.mem.eql(u8, out_value, "svg")) {
+                out = .svg;
             } else {
                 return error.WrongArgValue;
             }
@@ -292,7 +311,7 @@ test "parse build duplicated --qwerty-shortcuts" {
 }
 
 test "parse build duplicated --out" {
-    const args = [_][]const u8{ "kalamine", "build", "--out=all", "/test/file", "--out=all" };
+    const args = [_][]const u8{ "kalamine", "build", "--out=all", "/test/file", "--out=keylayout" };
     const result = parse(&args);
     try std.testing.expectEqual(error.DuplicatedArg, result);
 }
@@ -351,14 +370,78 @@ test "parse build file --qwerty-shortcuts" {
     );
 }
 
-test "parse build file --out=all" {
-    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=all" };
+test "parse build file --out=keylayout" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=keylayout" };
     const result = parse(&args);
     try std.testing.expectEqual(
         Command{
             .build = BuildCommand{
                 .file = "/test/file",
-                .out = .all,
+                .out = .keylayout,
+                .angle_mod = false,
+                .qwerty_shortcuts = false,
+            },
+        },
+        result,
+    );
+}
+
+test "parse build file --out=klc" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=klc" };
+    const result = parse(&args);
+    try std.testing.expectEqual(
+        Command{
+            .build = BuildCommand{
+                .file = "/test/file",
+                .out = .klc,
+                .angle_mod = false,
+                .qwerty_shortcuts = false,
+            },
+        },
+        result,
+    );
+}
+
+test "parse build file --out=xkb_keymap" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=xkb_keymap" };
+    const result = parse(&args);
+    try std.testing.expectEqual(
+        Command{
+            .build = BuildCommand{
+                .file = "/test/file",
+                .out = .xkb_keymap,
+                .angle_mod = false,
+                .qwerty_shortcuts = false,
+            },
+        },
+        result,
+    );
+}
+
+test "parse build file --out=xkb_symbols" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=xkb_symbols" };
+    const result = parse(&args);
+    try std.testing.expectEqual(
+        Command{
+            .build = BuildCommand{
+                .file = "/test/file",
+                .out = .xkb_symbols,
+                .angle_mod = false,
+                .qwerty_shortcuts = false,
+            },
+        },
+        result,
+    );
+}
+
+test "parse build file --out=svg" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=svg" };
+    const result = parse(&args);
+    try std.testing.expectEqual(
+        Command{
+            .build = BuildCommand{
+                .file = "/test/file",
+                .out = .svg,
                 .angle_mod = false,
                 .qwerty_shortcuts = false,
             },
