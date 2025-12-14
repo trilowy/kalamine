@@ -10,7 +10,7 @@ pub const Options = enum {
 pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
     switch (options) {
         .global => {
-            try writer.print(
+            try writer.writeAll(
                 \\Kalamine, a keyboard layout maker
                 \\
                 \\Usage:
@@ -33,10 +33,10 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
                 \\  -h --help           Show this screen.
                 \\  --version           Show version.
                 \\
-            , .{});
+            );
         },
         .build => {
-            try writer.print(
+            try writer.writeAll(
                 \\Convert TOML/YAML descriptions into OS-specific keyboard drivers.
                 \\
                 \\Usage:
@@ -50,10 +50,10 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
                 \\  --qwerty-shortcuts  Keep shortcuts at their Qwerty location.
                 \\  -h --help           Show this screen.
                 \\
-            , .{});
+            );
         },
         .new => {
-            try writer.print(
+            try writer.writeAll(
                 \\Create a new TOML layout description.
                 \\
                 \\Usage:
@@ -66,10 +66,10 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
                 \\  --1dk      Set a custom dead key.
                 \\  -h --help  Show this screen.
                 \\
-            , .{});
+            );
         },
         .watch => {
-            try writer.print(
+            try writer.writeAll(
                 \\Watch a layout description file and display it in a web browser.
                 \\
                 \\Usage:
@@ -80,7 +80,7 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
                 \\               (a.k.a. ISO key).
                 \\  -h --help    Show this screen.
                 \\
-            , .{});
+            );
         },
     }
     try writer.flush();

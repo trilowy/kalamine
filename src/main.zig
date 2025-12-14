@@ -36,23 +36,23 @@ fn execute() !void {
     const cmd = cli.parse(args) catch |err| {
         switch (err) {
             CliError.MissingArg => {
-                try stderr.print(
+                try stderr.writeAll(
                     \\kalamine: missing option
                     \\Try 'kalamine --help' for more information.
                     \\
-                , .{});
+                );
             },
             CliError.UnknownCommand,
             CliError.WrongArgValue,
             => {
-                try stderr.print(
+                try stderr.writeAll(
                     \\kalamine: invalid option
                     \\Try 'kalamine --help' for more information.
                     \\
-                , .{});
+                );
             },
             CliError.DuplicatedArg => {
-                try stderr.print("kalamine: duplicated option\n", .{});
+                try stderr.writeAll("kalamine: duplicated option\n");
             },
         }
         try stderr.flush();
@@ -62,19 +62,19 @@ fn execute() !void {
     switch (cmd) {
         .build => |options| {
             // TODO: to implement
-            try stdout.print("build command not yet implemented\n", .{});
+            try stdout.writeAll("build command not yet implemented\n");
             try stdout.flush();
             try build.run(options); // TODO: handle error
         },
         .new => |options| {
             // TODO: to implement
-            try stdout.print("new command not yet implemented\n", .{});
+            try stdout.writeAll("new command not yet implemented\n");
             try stdout.flush();
             try new.run(options); // TODO: handle error
         },
         .watch => |options| {
             // TODO: to implement
-            try stdout.print("watch command not yet implemented\n", .{});
+            try stdout.writeAll("watch command not yet implemented\n");
             try stdout.flush();
             try watch.run(options); // TODO: handle error
         },
