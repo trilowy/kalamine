@@ -1,7 +1,6 @@
 const std = @import("std");
-const new = @import("../command/new.zig");
-const Options = new.Options;
-const Geometry = new.Geometry;
+const Options = @import("../command/new.zig").Options;
+const Geometry = @import("../layout/layout.zig").Geometry;
 const CliError = @import("error.zig").CliError;
 
 pub fn parse(args: []const []const u8) CliError!Options {
@@ -30,22 +29,9 @@ pub fn parse(args: []const []const u8) CliError!Options {
             if (geometry != null) {
                 return CliError.DuplicatedArg;
             }
-            const geometry_value = arg["--geometry=".len..];
-            if (std.mem.startsWith(u8, geometry_value, "ISO")) {
-                geometry = .iso;
-            } else if (std.mem.startsWith(u8, geometry_value, "ANSI")) {
-                geometry = .ansi;
-            } else if (std.mem.startsWith(u8, geometry_value, "ERGO")) {
-                geometry = .ergo;
-            } else if (std.mem.startsWith(u8, geometry_value, "ABNT")) {
-                geometry = .abnt;
-            } else if (std.mem.startsWith(u8, geometry_value, "JIS")) {
-                geometry = .jis;
-            } else if (std.mem.startsWith(u8, geometry_value, "ALT")) {
-                geometry = .alt;
-            } else {
+            geometry = std.meta.stringToEnum(Geometry, arg["--geometry=".len..]) orelse {
                 return CliError.WrongArgValue;
-            }
+            };
         } else {
             if (output_file != null) {
                 return CliError.DuplicatedArg;
@@ -58,7 +44,7 @@ pub fn parse(args: []const []const u8) CliError!Options {
         return CliError.MissingArg;
     }
     if (geometry == null) {
-        geometry = .iso;
+        geometry = .ISO;
     }
     if (altgr == null) {
         altgr = false;
@@ -117,7 +103,7 @@ test "parse output file" {
     try std.testing.expectEqual(
         Options{
             .output_file = "/test/file",
-            .geometry = .iso,
+            .geometry = .ISO,
             .altgr = false,
             .odk = false,
         },
@@ -131,7 +117,7 @@ test "parse file --altgr" {
     try std.testing.expectEqual(
         Options{
             .output_file = "/test/file",
-            .geometry = .iso,
+            .geometry = .ISO,
             .altgr = true,
             .odk = false,
         },
@@ -145,7 +131,7 @@ test "parse file --1dk" {
     try std.testing.expectEqual(
         Options{
             .output_file = "/test/file",
-            .geometry = .iso,
+            .geometry = .ISO,
             .altgr = false,
             .odk = true,
         },
@@ -159,7 +145,7 @@ test "parse file --geometry=ISO" {
     try std.testing.expectEqual(
         Options{
             .output_file = "/test/file",
-            .geometry = .iso,
+            .geometry = .ISO,
             .altgr = false,
             .odk = false,
         },
@@ -173,7 +159,7 @@ test "parse file --geometry=ANSI" {
     try std.testing.expectEqual(
         Options{
             .output_file = "/test/file",
-            .geometry = .ansi,
+            .geometry = .ANSI,
             .altgr = false,
             .odk = false,
         },
@@ -187,7 +173,7 @@ test "parse file --geometry=ERGO" {
     try std.testing.expectEqual(
         Options{
             .output_file = "/test/file",
-            .geometry = .ergo,
+            .geometry = .ERGO,
             .altgr = false,
             .odk = false,
         },
@@ -201,7 +187,7 @@ test "parse file --geometry=ABNT" {
     try std.testing.expectEqual(
         Options{
             .output_file = "/test/file",
-            .geometry = .abnt,
+            .geometry = .ABNT,
             .altgr = false,
             .odk = false,
         },
@@ -215,7 +201,7 @@ test "parse file --geometry=JIS" {
     try std.testing.expectEqual(
         Options{
             .output_file = "/test/file",
-            .geometry = .jis,
+            .geometry = .JIS,
             .altgr = false,
             .odk = false,
         },
@@ -229,7 +215,7 @@ test "parse file --geometry=ALT" {
     try std.testing.expectEqual(
         Options{
             .output_file = "/test/file",
-            .geometry = .alt,
+            .geometry = .ALT,
             .altgr = false,
             .odk = false,
         },
@@ -243,7 +229,7 @@ test "parse file all args" {
     try std.testing.expectEqual(
         Options{
             .output_file = "/test/file",
-            .geometry = .iso,
+            .geometry = .ISO,
             .altgr = true,
             .odk = true,
         },
@@ -257,7 +243,7 @@ test "parse file all args in another order" {
     try std.testing.expectEqual(
         Options{
             .output_file = "/test/file",
-            .geometry = .iso,
+            .geometry = .ISO,
             .altgr = true,
             .odk = true,
         },

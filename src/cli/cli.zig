@@ -100,7 +100,7 @@ test "parse new all args" {
         Command{
             .new = new.Options{
                 .output_file = "/test/file",
-                .geometry = .iso,
+                .geometry = .ISO,
                 .altgr = true,
                 .odk = true,
             },

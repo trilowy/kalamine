@@ -1,19 +1,11 @@
 const std = @import("std");
+const Geometry = @import("../layout/layout.zig").Geometry;
 
 pub const Options = struct {
     output_file: []const u8,
     geometry: Geometry,
     altgr: bool,
     odk: bool,
-};
-
-pub const Geometry = enum {
-    iso,
-    ansi,
-    ergo,
-    abnt,
-    jis,
-    alt,
 };
 
 /// Create a new TOML layout description
@@ -24,19 +16,13 @@ pub fn run(options: Options) !void {
     const stdout = &stdout_writer.interface;
 
     try writeTomlHeader(stdout, options.geometry);
+    try writeLayout(stdout, options);
     // TODO: kalamine/help.py:145
     try stdout.flush();
-
-    // TODO: Provide geometry choices
-    // TODO: Create a new TOML layout description.
-    // @click.argument("output_file", nargs=1, type=click.Path(exists=False, path_type=Path))
-    // @click.option("--geometry", default="ISO", help="Specify keyboard geometry.")
-    // @click.option("--altgr/--no-altgr", default=False, help="Set an AltGr layer.")
-    // @click.option("--1dk/--no-1dk", "odk", default=False, help="Set a custom dead key.")
 }
 
 fn writeTomlHeader(writer: *std.Io.Writer, geometry: Geometry) !void {
-    try writer.writeAll(
+    try writer.print(
         \\# kalamine keyboard layout descriptor
         \\name        = "Qwerty-custom"  # full layout name, displayed in the keyboard settings
         \\name8       = "custom"         # short Windows filename: no spaces, no special chars
@@ -46,19 +32,80 @@ fn writeTomlHeader(writer: *std.Io.Writer, geometry: Geometry) !void {
         \\description = "Custom QWERTY layout"
         \\url         = "https://github.com/OneDeadKey/kalamine"
         \\version     = "0.0.1"
-        \\geometry    = "
-    );
-    try writeGeometry(writer, geometry);
-    try writer.writeAll("\"\n");
+        \\geometry    = "{s}"
+        \\
+    , .{@tagName(geometry)});
 }
 
-fn writeGeometry(writer: *std.Io.Writer, geometry: Geometry) !void {
-    switch (geometry) {
-        .iso => try writer.writeAll("ISO"),
-        .ansi => try writer.writeAll("ANSI"),
-        .ergo => try writer.writeAll("ERGO"),
-        .abnt => try writer.writeAll("ABNT"),
-        .jis => try writer.writeAll("JIS"),
-        .alt => try writer.writeAll("ALT"),
-    }
+/// Write an ASCII art description of a default layout
+fn writeLayout(writer: *std.Io.Writer, options: Options) !void {
+    // TODO:
+    try writer.writeAll(alpha_layout);
+    _ = options;
+
+    // TODO: kalamine/help.py:76
+    // TODO: kalamine/help.py:92
+    // TODO: kalamine/layout.py:142
+
+    // TODO: kalamine/help.py:108
 }
+
+const alpha_layout =
+    \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+    \\│ ~   │ !   │ @   │ #   │ $   │ %   │ ^   │ &   │ *   │ (   │ )   │ _   │ +   ┃          ┃
+    \\│ `   │ 1   │ 2   │ 3   │ 4   │ 5   │ 6   │ 7   │ 8   │ 9   │ 0   │ -   │ =   ┃ ⌫        ┃
+    \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┯━━━━━━━┩
+    \\┃        ┃ Q   │ W   │ E   │ R   │ T   │ Y   │ U   │ I   │ O   │ P   │ {   │ }   │ |     │
+    \\┃ ↹      ┃     │     │     │     │     │     │     │     │     │     │ [   │ ]   │ \     │
+    \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┲━━━━┷━━━━━━━┪
+    \\┃         ┃ A   │ S   │ D   │ F   │ G   │ H   │ J   │ K   │ L   │ :   │ "   ┃            ┃
+    \\┃ ⇬       ┃     │     │     │     │     │     │     │     │     │ ;   │ '   ┃ ⏎          ┃
+    \\┣━━━━━━━━━┻━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┻━━━━━━━━━━━━┫
+    \\┃            ┃ Z   │ X   │ C   │ V   │ B   │ N   │ M   │ <   │ >   │ ?   ┃               ┃
+    \\┃ ⇧          ┃     │     │     │     │     │     │     │ ,   │ .   │ /   ┃ ⇧             ┃
+    \\┣━━━━━━━┳━━━━┻━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+    \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+    \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl  ┃
+    \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+    \\
+;
+
+const odk_layout =
+    \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+    \\│ ~   │ !   │ @   │ #   │ $   │ %   │ ^   │ &   │ *   │ (   │ )   │ _   │ +   ┃          ┃
+    \\│ `   │ 1   │ 2 « │ 3 » │ 4   │ 5 € │ 6   │ 7   │ 8   │ 9   │ 0   │ -   │ =   ┃ ⌫        ┃
+    \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┯━━━━━━━┩
+    \\┃        ┃ Q   │ W   │ E   │ R   │ T   │ Y   │ U   │ I   │ O   │ P   │ {   │ }   │ |     │
+    \\┃ ↹      ┃     │     │   é │     │     │   ý │   ú │   í │   ó │     │ [   │ ]   │ \     │
+    \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┲━━━━┷━━━━━━━┪
+    \\┃         ┃ A   │ S   │ D   │ F   │ G   │ H   │ J   │ K   │ L   │ :   │*¨   ┃            ┃
+    \\┃ ⇬       ┃   á │     │     │     │     │     │     │     │     │ ;   │** ' ┃ ⏎          ┃
+    \\┣━━━━━━━━━┻━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┻━━━━━━━━━━━━┫
+    \\┃            ┃ Z   │ X   │ C   │ V   │ B   │ N   │ M   │ < • │ >   │ ?   ┃               ┃
+    \\┃ ⇧          ┃     │     │   ç │     │     │     │   µ │ , · │ . … │ /   ┃ ⇧             ┃
+    \\┣━━━━━━━┳━━━━┻━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+    \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+    \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl  ┃
+    \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+    \\
+;
+
+const altgr_layout =
+    \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+    \\│  *~ │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
+    \\│  *` │     │     │     │     │     │  *^ │     │     │     │     │     │     ┃ ⌫        ┃
+    \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┯━━━━━━━┩
+    \\┃        ┃     │     │     │     │     │     │     │     │     │     │     │     │       │
+    \\┃ ↹      ┃   @ │   < │   > │   $ │   % │   ^ │   & │   * │   ' │   ` │     │     │       │
+    \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┲━━━━┷━━━━━━━┪
+    \\┃         ┃     │     │     │     │     │     │     │     │     │     │  *¨ ┃            ┃
+    \\┃ ⇬       ┃   { │   ( │   ) │   } │   = │   \ │   + │   - │   / │   " │  *´ ┃ ⏎          ┃
+    \\┣━━━━━━━━━┻━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┻━━━━━━━━━━━━┫
+    \\┃            ┃     │     │     │     │     │     │     │     │     │     ┃               ┃
+    \\┃ ⇧          ┃   ~ │   [ │   ] │   _ │   # │   | │   ! │   ; │   : │   ? ┃ ⇧             ┃
+    \\┣━━━━━━━┳━━━━┻━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+    \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+    \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
+    \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+    \\
+;
