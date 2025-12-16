@@ -16,6 +16,17 @@ pub const Geometry = enum {
             .ALT => alt_template,
         };
     }
+
+    pub fn getKeys(self: Geometry) [4]RowDescription {
+        return switch (self) {
+            .ISO => iso_rows,
+            .ANSI => ansi_rows,
+            .ERGO => ergo_rows,
+            .ABNT => abnt_rows,
+            .JIS => jis_rows,
+            .ALT => alt_rows,
+        };
+    }
 };
 
 const Layer = enum {
@@ -39,6 +50,15 @@ const KeyboardLayout = struct {
     url: ?[]const u8,
     geometry: Geometry,
     version: ?[]const u8,
+};
+
+// TODO: kalamine/layout.py:276
+// parse template the same as python version? how to make it more robust?
+// better parsing error message?
+
+const RowDescription = struct {
+    offset: usize,
+    keys: []const KeyCode,
 };
 
 const KeyCode = enum {
@@ -94,49 +114,6 @@ const KeyCode = enum {
     tlde,
 };
 
-// TODO: kalamine/layout.py:276
-// parse template the same as python version? how to make it more robust?
-// better parsing error message?
-
-// TODO: find a structure for rows data
-// class RowDescr:
-//     offset: int
-//     keys: List[str]
-// enum for keys
-const ansi_template =
-    \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
-    \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
-    \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
-    \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┯━━━━━━━┩
-    \\┃        ┃     │     │     │     │     │     │     │     │     │     │     │     │       │
-    \\┃ ↹      ┃     │     │     │     │     │     │     │     │     │     │     │     │       │
-    \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┲━━━━┷━━━━━━━┪
-    \\┃         ┃     │     │     │     │     │     │     │     │     │     │     ┃            ┃
-    \\┃ ⇬       ┃     │     │     │     │     │     │     │     │     │     │     ┃ ⏎          ┃
-    \\┣━━━━━━━━━┻━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┻━━━━━━━━━━━━┫
-    \\┃            ┃     │     │     │     │     │     │     │     │     │     ┃               ┃
-    \\┃ ⇧          ┃     │     │     │     │     │     │     │     │     │     ┃ ⇧             ┃
-    \\┣━━━━━━━┳━━━━┻━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
-    \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
-    \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl  ┃
-    \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
-    \\
-;
-// TODO: see if comptime size is possible with RowDescr or parse at CLI launching
-// const args = [_][]const u8{ "kalamine", "unknown" };
-const ansi_rows =
-    \\rows:
-    \\  - offset: 2
-    \\    keys: [ tlde, ae01, ae02, ae03, ae04, ae05, ae06, ae07, ae08, ae09, ae10, ae11, ae12 ]
-    \\  - offset: 11
-    \\    keys: [       ad01, ad02, ad03, ad04, ad05, ad06, ad07, ad08, ad09, ad10, ad11, ad12, bksl ]
-    \\  - offset: 12
-    \\    keys: [       ac01, ac02, ac03, ac04, ac05, ac06, ac07, ac08, ac09, ac10, ac11 ]
-    \\  - offset: 15
-    \\    keys: [       ab01, ab02, ab03, ab04, ab05, ab06, ab07, ab08, ab09, ab10 ]
-    \\
-;
-
 const iso_template =
     \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
     \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
@@ -156,18 +133,100 @@ const iso_template =
     \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
     \\
 ;
-const iso_rows =
-    \\rows:
-    \\  - offset: 2
-    \\    keys: [ tlde, ae01, ae02, ae03, ae04, ae05, ae06, ae07, ae08, ae09, ae10, ae11, ae12 ]
-    \\  - offset: 11
-    \\    keys: [       ad01, ad02, ad03, ad04, ad05, ad06, ad07, ad08, ad09, ad10, ad11, ad12 ]
-    \\  - offset: 12
-    \\    keys: [       ac01, ac02, ac03, ac04, ac05, ac06, ac07, ac08, ac09, ac10, ac11, bksl ]
-    \\  - offset: 9
-    \\    keys: [ lsgt, ab01, ab02, ab03, ab04, ab05, ab06, ab07, ab08, ab09, ab10 ]
+
+const iso_rows = [_]RowDescription{
+    .{
+        .offset = 2,
+        .keys = &[_]KeyCode{ .tlde, .ae01, .ae02, .ae03, .ae04, .ae05, .ae06, .ae07, .ae08, .ae09, .ae10, .ae11, .ae12 },
+    },
+    .{
+        .offset = 11,
+        .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12 },
+    },
+    .{
+        .offset = 12,
+        .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11, .bksl },
+    },
+    .{
+        .offset = 9,
+        .keys = &[_]KeyCode{ .lsgt, .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10 },
+    },
+};
+
+const ansi_template =
+    \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+    \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
+    \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
+    \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┯━━━━━━━┩
+    \\┃        ┃     │     │     │     │     │     │     │     │     │     │     │     │       │
+    \\┃ ↹      ┃     │     │     │     │     │     │     │     │     │     │     │     │       │
+    \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┲━━━━┷━━━━━━━┪
+    \\┃         ┃     │     │     │     │     │     │     │     │     │     │     ┃            ┃
+    \\┃ ⇬       ┃     │     │     │     │     │     │     │     │     │     │     ┃ ⏎          ┃
+    \\┣━━━━━━━━━┻━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┻━━━━━━━━━━━━┫
+    \\┃            ┃     │     │     │     │     │     │     │     │     │     ┃               ┃
+    \\┃ ⇧          ┃     │     │     │     │     │     │     │     │     │     ┃ ⇧             ┃
+    \\┣━━━━━━━┳━━━━┻━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+    \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+    \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl  ┃
+    \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
     \\
 ;
+
+const ansi_rows = [_]RowDescription{
+    .{
+        .offset = 2,
+        .keys = &[_]KeyCode{ .tlde, .ae01, .ae02, .ae03, .ae04, .ae05, .ae06, .ae07, .ae08, .ae09, .ae10, .ae11, .ae12 },
+    },
+    .{
+        .offset = 11,
+        .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12, .bksl },
+    },
+    .{
+        .offset = 12,
+        .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11 },
+    },
+    .{
+        .offset = 15,
+        .keys = &[_]KeyCode{ .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10 },
+    },
+};
+
+const ergo_template =
+    \\╭╌╌╌╌╌┰─────┬─────┬─────┬─────┬─────┰─────┬─────┬─────┬─────┬─────┰╌╌╌╌╌┬╌╌╌╌╌╮
+    \\┆     ┃     │     │     │     │     ┃     │     │     │     │     ┃     ┆     ┆
+    \\┆     ┃     │     │     │     │     ┃     │     │     │     │     ┃     ┆     ┆
+    \\╰╌╌╌╌╌╂─────┼─────┼─────┼─────┼─────╂─────┼─────┼─────┼─────┼─────╂╌╌╌╌╌┼╌╌╌╌╌┤
+    \\      ┃     │     │     │     │     ┃     │     │     │     │     ┃     ┆     ┆
+    \\      ┃     │     │     │     │     ┃     │     │     │     │     ┃     ┆     ┆
+    \\      ┠─────┼─────┼─────┼─────┼─────╂─────┼─────┼─────┼─────┼─────╂╌╌╌╌╌┼╌╌╌╌╌┤
+    \\      ┃     │     │     │     │     ┃     │     │     │     │     ┃     ┆     ┆
+    \\      ┃     │     │     │     │     ┃     │     │     │     │     ┃     ┆     ┆
+    \\╭╌╌╌╌╌╂─────┼─────┼─────┼─────┼─────╂─────┼─────┼─────┼─────┼─────╂╌╌╌╌╌┴╌╌╌╌╌╯
+    \\┆     ┃     │     │     │     │     ┃     │     │     │     │     ┃
+    \\┆     ┃     │     │     │     │     ┃     │     │     │     │     ┃
+    \\╰╌╌╌╌╌┸─────┴─────┴─────┴─────┴─────┸─────┴─────┴─────┴─────┴─────┚
+    \\
+;
+
+const ergo_rows = [_]RowDescription{
+    .{
+        .offset = 2,
+        .keys = &[_]KeyCode{ .tlde, .ae01, .ae02, .ae03, .ae04, .ae05, .ae06, .ae07, .ae08, .ae09, .ae10, .ae11, .ae12 },
+    },
+    .{
+        .offset = 8,
+        .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12 },
+    },
+    .{
+        .offset = 8,
+        .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11, .bksl },
+    },
+    .{
+        .offset = 2,
+        .keys = &[_]KeyCode{ .lsgt, .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10 },
+    },
+};
 
 const abnt_template =
     \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
@@ -188,18 +247,25 @@ const abnt_template =
     \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
     \\
 ;
-const abnt_rows =
-    \\rows:
-    \\  - offset: 2
-    \\    keys: [ tlde, ae01, ae02, ae03, ae04, ae05, ae06, ae07, ae08, ae09, ae10, ae11, ae12 ]
-    \\  - offset: 11
-    \\    keys: [       ad01, ad02, ad03, ad04, ad05, ad06, ad07, ad08, ad09, ad10, ad11, ad12 ]
-    \\  - offset: 12
-    \\    keys: [       ac01, ac02, ac03, ac04, ac05, ac06, ac07, ac08, ac09, ac10, ac11, bksl ]
-    \\  - offset: 9
-    \\    keys: [ lsgt, ab01, ab02, ab03, ab04, ab05, ab06, ab07, ab08, ab09, ab10, ab11 ]
-    \\
-;
+
+const abnt_rows = [_]RowDescription{
+    .{
+        .offset = 2,
+        .keys = &[_]KeyCode{ .tlde, .ae01, .ae02, .ae03, .ae04, .ae05, .ae06, .ae07, .ae08, .ae09, .ae10, .ae11, .ae12 },
+    },
+    .{
+        .offset = 11,
+        .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12 },
+    },
+    .{
+        .offset = 12,
+        .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11, .bksl },
+    },
+    .{
+        .offset = 9,
+        .keys = &[_]KeyCode{ .lsgt, .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10, .ab11 },
+    },
+};
 
 const jis_template =
     \\┏━━━━━┱─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━┓
@@ -220,18 +286,25 @@ const jis_template =
     \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━┹──────────────┺━━━━━┻━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━━┛
     \\
 ;
-const jis_rows =
-    \\rows:
-    \\  - offset: 8
-    \\    keys: [ ae01, ae02, ae03, ae04, ae05, ae06, ae07, ae08, ae09, ae10, ae11, ae12, ae13 ]
-    \\  - offset: 11
-    \\    keys: [ ad01, ad02, ad03, ad04, ad05, ad06, ad07, ad08, ad09, ad10, ad11, ad12 ]
-    \\  - offset: 12
-    \\    keys: [ ac01, ac02, ac03, ac04, ac05, ac06, ac07, ac08, ac09, ac10, ac11, bksl ]
-    \\  - offset: 15
-    \\    keys: [ ab01, ab02, ab03, ab04, ab05, ab06, ab07, ab08, ab09, ab10, ab11 ]
-    \\
-;
+
+const jis_rows = [_]RowDescription{
+    .{
+        .offset = 8,
+        .keys = &[_]KeyCode{ .ae01, .ae02, .ae03, .ae04, .ae05, .ae06, .ae07, .ae08, .ae09, .ae10, .ae11, .ae12, .ae13 },
+    },
+    .{
+        .offset = 11,
+        .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12 },
+    },
+    .{
+        .offset = 12,
+        .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11, .bksl },
+    },
+    .{
+        .offset = 15,
+        .keys = &[_]KeyCode{ .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10, .ab11 },
+    },
+};
 
 const alt_template =
     \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━┓
@@ -252,44 +325,22 @@ const alt_template =
     \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━━┛
     \\
 ;
-const alt_rows =
-    \\rows:
-    \\  - offset: 2
-    \\    keys: [ tlde, ae01, ae02, ae03, ae04, ae05, ae06, ae07, ae08, ae09, ae10, ae11, ae12, bksl ]
-    \\  - offset: 11
-    \\    keys: [       ad01, ad02, ad03, ad04, ad05, ad06, ad07, ad08, ad09, ad10, ad11, ad12 ]
-    \\  - offset: 12
-    \\    keys: [       ac01, ac02, ac03, ac04, ac05, ac06, ac07, ac08, ac09, ac10, ac11 ]
-    \\  - offset: 15
-    \\    keys: [       ab01, ab02, ab03, ab04, ab05, ab06, ab07, ab08, ab09, ab10 ]
-    \\
-;
 
-const ergo_template =
-    \\╭╌╌╌╌╌┰─────┬─────┬─────┬─────┬─────┰─────┬─────┬─────┬─────┬─────┰╌╌╌╌╌┬╌╌╌╌╌╮
-    \\┆     ┃     │     │     │     │     ┃     │     │     │     │     ┃     ┆     ┆
-    \\┆     ┃     │     │     │     │     ┃     │     │     │     │     ┃     ┆     ┆
-    \\╰╌╌╌╌╌╂─────┼─────┼─────┼─────┼─────╂─────┼─────┼─────┼─────┼─────╂╌╌╌╌╌┼╌╌╌╌╌┤
-    \\      ┃     │     │     │     │     ┃     │     │     │     │     ┃     ┆     ┆
-    \\      ┃     │     │     │     │     ┃     │     │     │     │     ┃     ┆     ┆
-    \\      ┠─────┼─────┼─────┼─────┼─────╂─────┼─────┼─────┼─────┼─────╂╌╌╌╌╌┼╌╌╌╌╌┤
-    \\      ┃     │     │     │     │     ┃     │     │     │     │     ┃     ┆     ┆
-    \\      ┃     │     │     │     │     ┃     │     │     │     │     ┃     ┆     ┆
-    \\╭╌╌╌╌╌╂─────┼─────┼─────┼─────┼─────╂─────┼─────┼─────┼─────┼─────╂╌╌╌╌╌┴╌╌╌╌╌╯
-    \\┆     ┃     │     │     │     │     ┃     │     │     │     │     ┃
-    \\┆     ┃     │     │     │     │     ┃     │     │     │     │     ┃
-    \\╰╌╌╌╌╌┸─────┴─────┴─────┴─────┴─────┸─────┴─────┴─────┴─────┴─────┚
-    \\
-;
-const ergo_rows =
-    \\rows:
-    \\  - offset: 2
-    \\    keys: [ tlde, ae01, ae02, ae03, ae04, ae05, ae06, ae07, ae08, ae09, ae10, ae11, ae12 ]
-    \\  - offset: 8
-    \\    keys: [       ad01, ad02, ad03, ad04, ad05, ad06, ad07, ad08, ad09, ad10, ad11, ad12 ]
-    \\  - offset: 8
-    \\    keys: [       ac01, ac02, ac03, ac04, ac05, ac06, ac07, ac08, ac09, ac10, ac11, bksl ]
-    \\  - offset: 2
-    \\    keys: [ lsgt, ab01, ab02, ab03, ab04, ab05, ab06, ab07, ab08, ab09, ab10 ]
-    \\
-;
+const alt_rows = [_]RowDescription{
+    .{
+        .offset = 2,
+        .keys = &[_]KeyCode{ .tlde, .ae01, .ae02, .ae03, .ae04, .ae05, .ae06, .ae07, .ae08, .ae09, .ae10, .ae11, .ae12, .bksl },
+    },
+    .{
+        .offset = 11,
+        .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12 },
+    },
+    .{
+        .offset = 12,
+        .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11 },
+    },
+    .{
+        .offset = 15,
+        .keys = &[_]KeyCode{ .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10 },
+    },
+};
