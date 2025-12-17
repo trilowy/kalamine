@@ -26,6 +26,15 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    // Dependencies
+    const dep_opts = .{
+        .target = target,
+        .optimize = optimize,
+    };
+
+    const toml = b.dependency("toml", dep_opts);
+    exe_mod.addImport("toml", toml.module("toml"));
+
     // This creates another `std.Build.Step.Compile`, but this one builds an executable
     // rather than a static library.
     const exe = b.addExecutable(.{

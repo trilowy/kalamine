@@ -1,5 +1,8 @@
 const std = @import("std");
-const Geometry = @import("../layout/layout.zig").Geometry;
+const toml = @import("toml");
+const layout = @import("../layout/layout.zig");
+const Geometry = layout.Geometry;
+const KeyboardLayout = layout.KeyboardLayout;
 
 pub const Options = struct {
     output_file: []const u8,
@@ -19,6 +22,37 @@ pub fn run(options: Options) !void {
     try writeLayout(stdout, options);
     // TODO: kalamine/help.py:145
     try stdout.flush();
+
+    // TODO: test of toml lib
+    const file_content =
+        \\# kalamine keyboard layout descriptor
+        \\name        = "Qwerty-custom"  # full layout name, displayed in the keyboard settings
+        \\name8       = "custom"         # short Windows filename: no spaces, no special chars
+        \\locale      = "us"             # locale/language id
+        \\variant     = "custom"         # layout variant id
+        \\author      = "nobody"         # author name
+        \\description = "Custom QWERTY layout"
+        \\url         = "https://github.com/OneDeadKey/kalamine"
+        \\version     = "0.0.1"
+        \\geometry    = "ANSI"
+        \\
+    ;
+
+    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+    const allocator = debug_allocator.allocator();
+    defer _ = debug_allocator.deinit();
+
+    var parser = toml.Parser(KeyboardLayout).init(allocator);
+    defer parser.deinit();
+
+    var result = try parser.parseString(file_content);
+    defer result.deinit();
+
+    const config = result.value;
+    std.debug.print("name: {s}\nname8: {s}\ngeometry: {any}\n", .{ config.name.?, config.name8, config.geometry });
+    // TODO: end of test
+
+    std.debug.print("{any}\n", .{options.geometry.getKeys()});
 }
 
 fn writeTomlHeader(writer: *std.Io.Writer, geometry: Geometry) !void {

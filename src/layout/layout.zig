@@ -39,7 +39,7 @@ const Layer = enum {
 };
 // TODO: if needed: @intFromEnum(Layer.base)
 
-const KeyboardLayout = struct {
+pub const KeyboardLayout = struct {
     // TODO: kalamine/layout.py:142
     name: ?[]const u8,
     name8: []const u8,
@@ -55,6 +55,9 @@ const KeyboardLayout = struct {
 // TODO: kalamine/layout.py:276
 // parse template the same as python version? how to make it more robust?
 // better parsing error message?
+// parse first the template to see if it matches perfectly first?
+// tips of why it might not match: spaces at the beginning of the line
+// row and column where it does not match
 
 const RowDescription = struct {
     offset: usize,
