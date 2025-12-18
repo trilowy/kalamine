@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const Geometry = enum {
     ISO,
     ANSI,
@@ -36,6 +38,17 @@ const Layer = enum {
     odk_shift,
     altgr,
     altgr_shift,
+
+    fn shifted(self: Layer) Layer {
+        return switch (self) {
+            .base => .shift,
+            .shift => .shift,
+            .odk => .odk_shift,
+            .odk_shift => .odk_shift,
+            .altgr => .altgr_shift,
+            .altgr_shift => .altgr_shift,
+        };
+    }
 };
 // TODO: if needed: @intFromEnum(Layer.base)
 
@@ -50,6 +63,51 @@ pub const KeyboardLayout = struct {
     url: ?[]const u8,
     geometry: Geometry,
     version: ?[]const u8,
+
+    /// Extract a keyboard layer from a template
+    fn parseTemplate(
+        self: *KeyboardLayout,
+        allocator: std.mem.Allocator,
+        template: []const []const u8,
+        rows: []const RowDescription,
+        layer: Layer,
+    ) !void {
+        var j = 0;
+        const col_offset = if (layer == .base) 0 else 2;
+        for (rows) |row| {
+            var i = row.offset + col_offset;
+
+            const base = template[2 + j * 3];
+            const shift = template[1 + j * 3];
+
+            for (row.keys) |key| {
+                var base_key = if (base[i - 1] == '*') {
+                    return base[(i - 1)..(i + 1)];
+                } else {
+                    return base[i..(i + 1)];
+                };
+
+                const shift_key = if (base[i - 1] == '*') {
+                    return shift[(i - 1)..(i + 1)];
+                } else {
+                    return shift[i..(i + 1)];
+                };
+
+                // In the base layer, if the base character is undefined, shift prevails
+                if (std.mem.eql(u8, base_key, " ")) {
+                    if (layer == .base) {
+                        // TODO: alloc all keys to keep them, need to free the previous base_key
+                        // Or, I can use enum for all possible values? Is it useful for driver generation?
+                        base_key = try std.ascii.allocLowerString(allocator, shift_key);
+                        // TODO: kalamine/layout.py:295
+                    }
+                }
+
+                i += 6;
+            }
+            j += 1;
+        }
+    }
 };
 
 // TODO: kalamine/layout.py:276
