@@ -1,4 +1,5 @@
 const std = @import("std");
+const toml = @import("toml");
 
 pub const Geometry = enum {
     ISO,
@@ -52,21 +53,151 @@ const Layer = enum {
 };
 // TODO: if needed: @intFromEnum(Layer.base)
 
-pub const KeyboardLayout = struct {
-    // TODO: kalamine/layout.py:142
+const TomlContent = struct {
     name: ?[]const u8,
     name8: []const u8,
     locale: ?[]const u8,
     variant: ?[]const u8,
-    description: ?[]const u8,
     author: ?[]const u8,
+    description: ?[]const u8,
     url: ?[]const u8,
-    geometry: Geometry,
     version: ?[]const u8,
+    geometry: Geometry,
+};
+
+pub const KeyboardLayout = struct {
+    // TODO: kalamine/layout.py:142
+
+    /// Full layout name, displayed in the keyboard settings
+    name: ?[]const u8,
+    /// Short Windows filename: no spaces, no special chars
+    name8: []const u8,
+    /// Locale/language ID
+    locale: ?[]const u8,
+    /// Layout variant ID
+    variant: ?[]const u8,
+    /// Author name
+    author: ?[]const u8,
+    description: ?[]const u8,
+    url: ?[]const u8,
+    version: ?[]const u8,
+    geometry: Geometry,
+    layers: std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []u8)),
+
+    /// Deinitialize with `deinit`
+    pub fn initFromToml(
+        allocator: std.mem.Allocator,
+        reader: *std.Io.Reader,
+    ) !KeyboardLayout {
+        // Read all
+        const toml_content: []const u8 = try reader.allocRemaining(allocator, .unlimited);
+        defer allocator.free(toml_content);
+
+        // Parse TOML
+        var toml_parser = toml.Parser(TomlContent).init(allocator);
+        defer toml_parser.deinit();
+
+        var result = try toml_parser.parseString(toml_content);
+        defer result.deinit();
+
+        const parsed_toml = result.value;
+
+        // Own the memory of each field to free the rest
+        const name = if (parsed_toml.name) |name|
+            try allocator.dupe(u8, name)
+        else
+            null;
+
+        const name8 = try allocator.dupe(u8, parsed_toml.name8);
+
+        const locale = if (parsed_toml.locale) |locale|
+            try allocator.dupe(u8, locale)
+        else
+            null;
+
+        const variant = if (parsed_toml.variant) |variant|
+            try allocator.dupe(u8, variant)
+        else
+            null;
+
+        const author = if (parsed_toml.author) |author|
+            try allocator.dupe(u8, author)
+        else
+            null;
+
+        const description = if (parsed_toml.description) |description|
+            try allocator.dupe(u8, description)
+        else
+            null;
+
+        const url = if (parsed_toml.url) |url|
+            try allocator.dupe(u8, url)
+        else
+            null;
+
+        const version = if (parsed_toml.version) |version|
+            try allocator.dupe(u8, version)
+        else
+            null;
+
+        const layers = std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []u8)).empty;
+
+        return KeyboardLayout{
+            .name = name,
+            .name8 = name8,
+            .locale = locale,
+            .variant = variant,
+            .author = author,
+            .description = description,
+            .url = url,
+            .version = version,
+            .geometry = parsed_toml.geometry,
+            .layers = layers,
+        };
+    }
+
+    pub fn deinit(self: *KeyboardLayout, allocator: std.mem.Allocator) void {
+        if (self.name) |name| {
+            allocator.free(name);
+        }
+
+        allocator.free(self.name8);
+
+        if (self.locale) |locale| {
+            allocator.free(locale);
+        }
+
+        if (self.variant) |variant| {
+            allocator.free(variant);
+        }
+
+        if (self.author) |author| {
+            allocator.free(author);
+        }
+
+        if (self.description) |description| {
+            allocator.free(description);
+        }
+
+        if (self.url) |url| {
+            allocator.free(url);
+        }
+
+        if (self.version) |version| {
+            allocator.free(version);
+        }
+
+        var layers_iterator = self.layers.valueIterator();
+        while (layers_iterator.next()) |layer| {
+            layer.deinit(allocator);
+        }
+        self.layers.deinit(allocator);
+
+        self.* = undefined;
+    }
 
     /// Extract a keyboard layer from a template
     fn parseTemplate(
-        self: *KeyboardLayout,
         allocator: std.mem.Allocator,
         template: []const []const u8,
         rows: []const RowDescription,
@@ -81,6 +212,7 @@ pub const KeyboardLayout = struct {
             const shift = template[1 + j * 3];
 
             for (row.keys) |key| {
+                _ = key; // TODO:
                 var base_key = if (base[i - 1] == '*') {
                     return base[(i - 1)..(i + 1)];
                 } else {

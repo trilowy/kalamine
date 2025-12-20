@@ -1,5 +1,4 @@
 const std = @import("std");
-const toml = @import("toml");
 const layout = @import("../layout/layout.zig");
 const Geometry = layout.Geometry;
 const KeyboardLayout = layout.KeyboardLayout;
@@ -23,7 +22,7 @@ pub fn run(options: Options) !void {
     // TODO: kalamine/help.py:145
     try stdout.flush();
 
-    // TODO: test of toml lib
+    // TODO: test of toml
     const file_content =
         \\# kalamine keyboard layout descriptor
         \\name        = "Qwerty-custom"  # full layout name, displayed in the keyboard settings
@@ -42,15 +41,10 @@ pub fn run(options: Options) !void {
     const allocator = debug_allocator.allocator();
     defer _ = debug_allocator.deinit();
 
-    var parser = toml.Parser(KeyboardLayout).init(allocator);
-    defer parser.deinit();
-
-    var result = try parser.parseString(file_content);
-    defer result.deinit();
-
-    const config = result.value;
-    std.debug.print("name: {s}\nname8: {s}\ngeometry: {any}\n", .{ config.name.?, config.name8, config.geometry });
-    // TODO: end of test
+    var reader = std.Io.Reader.fixed(file_content);
+    var keyboard_layout = try KeyboardLayout.initFromToml(allocator, &reader);
+    defer keyboard_layout.deinit(allocator);
+    std.debug.print("parse\n{any}\n", .{keyboard_layout});
 
     std.debug.print("{any}\n", .{options.geometry.getKeys()});
 }
