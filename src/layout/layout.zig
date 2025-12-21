@@ -55,21 +55,28 @@ const Layer = enum {
 
 const TomlContent = struct {
     name: ?[]const u8,
-    name8: []const u8,
+    name8: ?[]const u8,
     locale: ?[]const u8,
     variant: ?[]const u8,
     author: ?[]const u8,
     description: ?[]const u8,
     url: ?[]const u8,
     version: ?[]const u8,
-    geometry: Geometry,
+    geometry: ?Geometry,
+    base: ?[]const u8,
+    full: ?[]const u8,
+    altgr: ?[]const u8,
+};
+
+pub const ParseOptions = struct {
+    error_message: ?[]const u8 = null,
 };
 
 pub const KeyboardLayout = struct {
     // TODO: kalamine/layout.py:142
 
     /// Full layout name, displayed in the keyboard settings
-    name: ?[]const u8,
+    name: []const u8,
     /// Short Windows filename: no spaces, no special chars
     name8: []const u8,
     /// Locale/language ID
@@ -85,9 +92,11 @@ pub const KeyboardLayout = struct {
     layers: std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []u8)),
 
     /// Deinitialize with `deinit`
+    /// In case of error, deinitialize the error message if present in options
     pub fn initFromToml(
         allocator: std.mem.Allocator,
         reader: *std.Io.Reader,
+        options: *ParseOptions,
     ) !KeyboardLayout {
         // Read all
         const toml_content: []const u8 = try reader.allocRemaining(allocator, .unlimited);
@@ -105,10 +114,15 @@ pub const KeyboardLayout = struct {
         // Own the memory of each field to free the rest
         const name = if (parsed_toml.name) |name|
             try allocator.dupe(u8, name)
-        else
-            null;
+        else {
+            options.error_message = try allocator.dupe(u8, "Parse error: missing mandatory 'name' attribute\n");
+            return error.LayoutParsingError;
+        };
 
-        const name8 = try allocator.dupe(u8, parsed_toml.name8);
+        const name8 = if (parsed_toml.name8) |name8|
+            try allocator.dupe(u8, name8)
+        else
+            try allocator.dupe(u8, name[0..8]);
 
         const locale = if (parsed_toml.locale) |locale|
             try allocator.dupe(u8, locale)
@@ -140,7 +154,17 @@ pub const KeyboardLayout = struct {
         else
             null;
 
-        const layers = std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []u8)).empty;
+        const geometry = if (parsed_toml.geometry) |geometry|
+            geometry
+        else {
+            options.error_message = try allocator.dupe(u8, "Parse error: missing mandatory 'geometry' attribute\n");
+            return error.LayoutParsingError;
+        };
+
+        var layers = std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []u8)).empty;
+        for (std.enums.values(Layer)) |layer| {
+            try layers.put(allocator, layer, std.AutoHashMapUnmanaged(KeyCode, []u8).empty);
+        }
 
         return KeyboardLayout{
             .name = name,
@@ -151,15 +175,13 @@ pub const KeyboardLayout = struct {
             .description = description,
             .url = url,
             .version = version,
-            .geometry = parsed_toml.geometry,
+            .geometry = geometry,
             .layers = layers,
         };
     }
 
     pub fn deinit(self: *KeyboardLayout, allocator: std.mem.Allocator) void {
-        if (self.name) |name| {
-            allocator.free(name);
-        }
+        allocator.free(self.name);
 
         allocator.free(self.name8);
 
@@ -212,7 +234,6 @@ pub const KeyboardLayout = struct {
             const shift = template[1 + j * 3];
 
             for (row.keys) |key| {
-                _ = key; // TODO:
                 var base_key = if (base[i - 1] == '*') {
                     return base[(i - 1)..(i + 1)];
                 } else {
@@ -232,6 +253,7 @@ pub const KeyboardLayout = struct {
                         // Or, I can use enum for all possible values? Is it useful for driver generation?
                         base_key = try std.ascii.allocLowerString(allocator, shift_key);
                         // TODO: kalamine/layout.py:295
+                        _ = key; // TODO:
                     }
                 }
 

@@ -25,7 +25,7 @@ pub fn run(options: Options) !void {
     // TODO: test of toml
     const file_content =
         \\# kalamine keyboard layout descriptor
-        \\name        = "Qwerty-custom"  # full layout name, displayed in the keyboard settings
+        // \\name        = "Qwerty-custom"  # full layout name, displayed in the keyboard settings
         \\name8       = "custom"         # short Windows filename: no spaces, no special chars
         \\locale      = "us"             # locale/language id
         \\variant     = "custom"         # layout variant id
@@ -42,7 +42,17 @@ pub fn run(options: Options) !void {
     defer _ = debug_allocator.deinit();
 
     var reader = std.Io.Reader.fixed(file_content);
-    var keyboard_layout = try KeyboardLayout.initFromToml(allocator, &reader);
+    // var keyboard_layout = try KeyboardLayout.initFromToml(allocator, &reader);
+    var parse_options = layout.ParseOptions{};
+    var keyboard_layout = KeyboardLayout.initFromToml(allocator, &reader, &parse_options) catch |err| {
+        std.debug.print("{any}\n", .{err});
+        if (parse_options.error_message) |error_message| {
+            std.debug.print("{s}", .{error_message});
+            allocator.free(error_message);
+            parse_options.error_message = null;
+        }
+        return err;
+    };
     defer keyboard_layout.deinit(allocator);
     std.debug.print("parse\n{any}\n", .{keyboard_layout});
 

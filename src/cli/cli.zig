@@ -8,7 +8,41 @@ const watch = @import("../command/watch.zig");
 const Command = @import("../command/command.zig").Command;
 const CliError = @import("error.zig").CliError;
 
-pub fn parse(args: []const []const u8) CliError!Command {
+pub const ParseOptions = struct {
+    diagnostic: ?*Diagnostic = null,
+};
+
+pub const Diagnostic = struct {
+    arg: []const u8 = "",
+
+    pub fn report(self: Diagnostic, writer: *std.Io.Writer, err: anyerror) !void {
+        switch (err) {
+            CliError.MissingArg => {
+                try writer.writeAll(
+                    \\kalamine: missing option
+                    \\Try 'kalamine --help' for more information.
+                    \\
+                );
+            },
+            CliError.UnknownCommand,
+            CliError.WrongArgValue,
+            => {
+                try writer.print(
+                    \\kalamine: invalid option '{s}'
+                    \\Try 'kalamine --help' for more information.
+                    \\
+                , .{self.arg});
+            },
+            CliError.DuplicatedArg => {
+                try writer.writeAll("kalamine: duplicated option\n");
+            },
+            else => try writer.print("kalamine: while parsing arguments: {s}\n", .{@errorName(err)}),
+        }
+        try writer.flush();
+    }
+};
+
+pub fn parse(args: []const []const u8, parse_options: ParseOptions) CliError!Command {
     // Must at least have one arg for the command
     const action = if (args.len > 1) args[1] else {
         return CliError.MissingArg;
@@ -39,6 +73,9 @@ pub fn parse(args: []const []const u8) CliError!Command {
     } else if (std.mem.eql(u8, action, "--help") or std.mem.eql(u8, action, "-h")) {
         return .{ .help = .global };
     } else {
+        if (parse_options.diagnostic) |diagnostic| {
+            diagnostic.*.arg = action;
+        }
         return CliError.UnknownCommand;
     }
 }

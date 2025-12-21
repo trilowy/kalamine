@@ -3,10 +3,14 @@ const build = @import("../command/build.zig");
 const Options = build.Options;
 const Out = build.Out;
 const CliError = @import("error.zig").CliError;
+const ParseOptions = @import("cli.zig").ParseOptions;
 
-pub fn parse(args: []const []const u8) CliError!Options {
+pub fn parse(args: []const []const u8, parse_options: ParseOptions) CliError!Options {
     // Must at least have one arg
     if (args.len == 0) {
+        if (parse_options.diagnostic) |diagnostic| {
+            diagnostic.*.arg = "<file>";
+        }
         return CliError.MissingArg;
     }
 
@@ -18,23 +22,38 @@ pub fn parse(args: []const []const u8) CliError!Options {
     for (args) |arg| {
         if (std.mem.eql(u8, arg, "--angle-mod")) {
             if (angle_mod != null) {
+                if (parse_options.diagnostic) |diagnostic| {
+                    diagnostic.*.arg = "--angle-mod";
+                }
                 return CliError.DuplicatedArg;
             }
             angle_mod = true;
         } else if (std.mem.eql(u8, arg, "--qwerty-shortcuts")) {
             if (qwerty_shortcuts != null) {
+                if (parse_options.diagnostic) |diagnostic| {
+                    diagnostic.*.arg = "--qwerty-shortcuts";
+                }
                 return CliError.DuplicatedArg;
             }
             qwerty_shortcuts = true;
         } else if (std.mem.startsWith(u8, arg, "--out=")) {
             if (out != null) {
+                if (parse_options.diagnostic) |diagnostic| {
+                    diagnostic.*.arg = "--out";
+                }
                 return CliError.DuplicatedArg;
             }
             out = std.meta.stringToEnum(Out, arg["--out=".len..]) orelse {
+                if (parse_options.diagnostic) |diagnostic| {
+                    diagnostic.*.arg = arg;
+                }
                 return CliError.WrongArgValue;
             };
         } else {
             if (file != null) {
+                if (parse_options.diagnostic) |diagnostic| {
+                    diagnostic.*.arg = "<file>";
+                }
                 return CliError.DuplicatedArg;
             }
             file = arg;

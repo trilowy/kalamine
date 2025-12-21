@@ -1,6 +1,3 @@
-//! By convention, main.zig is where your main function lives in the case that
-//! you are building an executable.
-
 const std = @import("std");
 const cli = @import("cli/cli.zig");
 const cli_help = @import("cli/cli_help.zig");
