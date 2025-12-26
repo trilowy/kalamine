@@ -69,46 +69,32 @@ const TomlContent = struct {
 };
 
 pub const ParseOptions = struct {
-    error_message: ?[]const u8 = null,
+    diagnostic: ?*Diagnostic = null,
 };
 
-// TODO:
-// pub const ParseOptions = struct {
-//     diagnostic: ?*Diagnostic = null,
-// };
-//
-// pub const Diagnostic = struct {
-//     arg: []const u8 = "",
-//
-//     pub fn report(self: Diagnostic, writer: *std.Io.Writer, err: anyerror) !void {
-//         switch (err) {
-//             CliError.MissingArg => {
-//                 try writer.writeAll(
-//                     \\kalamine: missing option
-//                     \\Try 'kalamine --help' for more information.
-//                     \\
-//                 );
-//             },
-//             CliError.UnknownCommand,
-//             CliError.WrongArgValue,
-//             => {
-//                 try writer.print(
-//                     \\kalamine: invalid option '{s}'
-//                     \\Try 'kalamine --help' for more information.
-//                     \\
-//                 , .{self.arg});
-//             },
-//             CliError.DuplicatedArg => {
-//                 try writer.writeAll("kalamine: duplicated option\n");
-//             },
-//             else => try writer.print("kalamine: while parsing arguments: {s}\n", .{@errorName(err)}),
-//         }
-//         try writer.flush();
-//     }
-// };
+pub const Diagnostic = struct {
+    arg: []const u8 = "",
+
+    pub fn report(self: Diagnostic, writer: *std.Io.Writer, err: anyerror) !void {
+        switch (err) {
+            LayoutParsingError.MissingAttribute => {
+                try writer.print("kalamine: parse error: missing mandatory '{s}' attribute\n", .{self.arg});
+                try writer.flush();
+            },
+            else => {},
+        }
+    }
+};
+
+const LayoutParsingError = error{
+    MissingAttribute,
+};
 
 pub const KeyboardLayout = struct {
     // TODO: kalamine/layout.py:142
+
+    /// Store all values
+    arena_allocator: std.heap.ArenaAllocator,
 
     /// Full layout name, displayed in the keyboard settings
     name: []const u8,
@@ -131,7 +117,7 @@ pub const KeyboardLayout = struct {
     pub fn initFromToml(
         allocator: std.mem.Allocator,
         reader: *std.Io.Reader,
-        options: *ParseOptions,
+        options: ParseOptions,
     ) !KeyboardLayout {
         // Read all
         const toml_content: []const u8 = try reader.allocRemaining(allocator, .unlimited);
@@ -146,62 +132,67 @@ pub const KeyboardLayout = struct {
 
         const parsed_toml = result.value;
 
+        var arena_allocator = std.heap.ArenaAllocator.init(allocator);
+        const arena = arena_allocator.allocator();
+        errdefer arena_allocator.deinit();
+
         // Own the memory of each field to free the rest
         const name = if (parsed_toml.name) |name|
-            try allocator.dupe(u8, name)
+            try arena.dupe(u8, name)
         else {
-            options.error_message = try allocator.dupe(u8, "Parse error: missing mandatory 'name' attribute\n");
-            return error.LayoutParsingError;
+            if (options.diagnostic) |diag| diag.arg = "name";
+            return LayoutParsingError.MissingAttribute;
         };
 
         const name8 = if (parsed_toml.name8) |name8|
-            try allocator.dupe(u8, name8)
+            try arena.dupe(u8, name8)
         else
-            try allocator.dupe(u8, name[0..8]);
+            try arena.dupe(u8, name[0..8]);
 
         const locale = if (parsed_toml.locale) |locale|
-            try allocator.dupe(u8, locale)
+            try arena.dupe(u8, locale)
         else
             null;
 
         const variant = if (parsed_toml.variant) |variant|
-            try allocator.dupe(u8, variant)
+            try arena.dupe(u8, variant)
         else
             null;
 
         const author = if (parsed_toml.author) |author|
-            try allocator.dupe(u8, author)
+            try arena.dupe(u8, author)
         else
             null;
 
         const description = if (parsed_toml.description) |description|
-            try allocator.dupe(u8, description)
+            try arena.dupe(u8, description)
         else
             null;
 
         const url = if (parsed_toml.url) |url|
-            try allocator.dupe(u8, url)
+            try arena.dupe(u8, url)
         else
             null;
 
         const version = if (parsed_toml.version) |version|
-            try allocator.dupe(u8, version)
+            try arena.dupe(u8, version)
         else
             null;
 
         const geometry = if (parsed_toml.geometry) |geometry|
             geometry
         else {
-            options.error_message = try allocator.dupe(u8, "Parse error: missing mandatory 'geometry' attribute\n");
-            return error.LayoutParsingError;
+            if (options.diagnostic) |diag| diag.arg = "geometry";
+            return LayoutParsingError.MissingAttribute;
         };
 
         var layers = std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []u8)).empty;
         for (std.enums.values(Layer)) |layer| {
-            try layers.put(allocator, layer, std.AutoHashMapUnmanaged(KeyCode, []u8).empty);
+            try layers.put(arena, layer, std.AutoHashMapUnmanaged(KeyCode, []u8).empty);
         }
 
         return KeyboardLayout{
+            .arena_allocator = arena_allocator,
             .name = name,
             .name8 = name8,
             .locale = locale,
@@ -215,41 +206,8 @@ pub const KeyboardLayout = struct {
         };
     }
 
-    pub fn deinit(self: *KeyboardLayout, allocator: std.mem.Allocator) void {
-        allocator.free(self.name);
-
-        allocator.free(self.name8);
-
-        if (self.locale) |locale| {
-            allocator.free(locale);
-        }
-
-        if (self.variant) |variant| {
-            allocator.free(variant);
-        }
-
-        if (self.author) |author| {
-            allocator.free(author);
-        }
-
-        if (self.description) |description| {
-            allocator.free(description);
-        }
-
-        if (self.url) |url| {
-            allocator.free(url);
-        }
-
-        if (self.version) |version| {
-            allocator.free(version);
-        }
-
-        var layers_iterator = self.layers.valueIterator();
-        while (layers_iterator.next()) |layer| {
-            layer.deinit(allocator);
-        }
-        self.layers.deinit(allocator);
-
+    pub fn deinit(self: *KeyboardLayout) void {
+        self.arena_allocator.deinit();
         self.* = undefined;
     }
 

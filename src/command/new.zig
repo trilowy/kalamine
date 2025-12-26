@@ -25,7 +25,7 @@ pub fn run(allocator: std.mem.Allocator, options: Options) !void {
     // TODO: test of toml
     const file_content =
         \\# kalamine keyboard layout descriptor
-        // \\name        = "Qwerty-custom"  # full layout name, displayed in the keyboard settings
+        \\name        = "Qwerty-custom"  # full layout name, displayed in the keyboard settings
         \\name8       = "custom"         # short Windows filename: no spaces, no special chars
         \\locale      = "us"             # locale/language id
         \\variant     = "custom"         # layout variant id
@@ -33,23 +33,19 @@ pub fn run(allocator: std.mem.Allocator, options: Options) !void {
         \\description = "Custom QWERTY layout"
         \\url         = "https://github.com/OneDeadKey/kalamine"
         \\version     = "0.0.1"
-        \\geometry    = "ANSI"
+        // \\geometry    = "ANSI"
         \\
     ;
 
     var reader = std.Io.Reader.fixed(file_content);
-    // var keyboard_layout = try KeyboardLayout.initFromToml(allocator, &reader);
-    var parse_options = layout.ParseOptions{};
-    var keyboard_layout = KeyboardLayout.initFromToml(allocator, &reader, &parse_options) catch |err| {
-        std.debug.print("{any}\n", .{err});
-        if (parse_options.error_message) |error_message| {
-            std.debug.print("{s}", .{error_message});
-            allocator.free(error_message);
-            parse_options.error_message = null;
-        }
+    // var keyboard_layout = try KeyboardLayout.initFromToml(allocator, &reader, .{});
+    var diag = layout.Diagnostic{};
+    var keyboard_layout = KeyboardLayout.initFromToml(allocator, &reader, .{ .diagnostic = &diag }) catch |err| {
+        try diag.report(stdout, err);
         return err;
+        // TODO: no error for new layout but report error at higher level for build
     };
-    defer keyboard_layout.deinit(allocator);
+    defer keyboard_layout.deinit();
     std.debug.print("parse\n{any}\n", .{keyboard_layout});
 
     std.debug.print("{any}\n", .{options.geometry.getKeys()});
