@@ -11,7 +11,7 @@ pub const Options = struct {
 };
 
 /// Create a new TOML layout description
-pub fn run(options: Options) !void {
+pub fn run(allocator: std.mem.Allocator, options: Options) !void {
     // TODO: replace stdout by a file
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
@@ -36,10 +36,6 @@ pub fn run(options: Options) !void {
         \\geometry    = "ANSI"
         \\
     ;
-
-    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-    const allocator = debug_allocator.allocator();
-    defer _ = debug_allocator.deinit();
 
     var reader = std.Io.Reader.fixed(file_content);
     // var keyboard_layout = try KeyboardLayout.initFromToml(allocator, &reader);

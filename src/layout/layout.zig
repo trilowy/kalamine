@@ -72,6 +72,41 @@ pub const ParseOptions = struct {
     error_message: ?[]const u8 = null,
 };
 
+// TODO:
+// pub const ParseOptions = struct {
+//     diagnostic: ?*Diagnostic = null,
+// };
+//
+// pub const Diagnostic = struct {
+//     arg: []const u8 = "",
+//
+//     pub fn report(self: Diagnostic, writer: *std.Io.Writer, err: anyerror) !void {
+//         switch (err) {
+//             CliError.MissingArg => {
+//                 try writer.writeAll(
+//                     \\kalamine: missing option
+//                     \\Try 'kalamine --help' for more information.
+//                     \\
+//                 );
+//             },
+//             CliError.UnknownCommand,
+//             CliError.WrongArgValue,
+//             => {
+//                 try writer.print(
+//                     \\kalamine: invalid option '{s}'
+//                     \\Try 'kalamine --help' for more information.
+//                     \\
+//                 , .{self.arg});
+//             },
+//             CliError.DuplicatedArg => {
+//                 try writer.writeAll("kalamine: duplicated option\n");
+//             },
+//             else => try writer.print("kalamine: while parsing arguments: {s}\n", .{@errorName(err)}),
+//         }
+//         try writer.flush();
+//     }
+// };
+
 pub const KeyboardLayout = struct {
     // TODO: kalamine/layout.py:142
 

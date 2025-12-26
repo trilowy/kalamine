@@ -13,25 +13,16 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
             try writer.writeAll(
                 \\Kalamine, a keyboard layout maker
                 \\
-                \\Usage:
-                \\  kalamine build <file> [--out=(all)] [--angle-mod] [--qwerty-shortcuts] [-h | --help]
-                \\  kalamine new <output_file> [--geometry=(ISO)] [--altgr] [--1dk] [-h | --help]
-                \\  kalamine watch <file> [--angle-mod] [-h | --help]
-                \\  kalamine -h | --help
-                \\  kalamine --version
+                \\Usage: kalamine [command] [options]
+                \\
+                \\Commands:
+                \\  build <file> [options]  Convert TOML/YAML descriptions into OS-specific keyboard drivers.
+                \\  new <file> [options]    Create a new TOML layout description.
+                \\  watch <file> [options]  Watch a layout description file and display it in a web browser.
                 \\
                 \\Options:
-                \\  --out=(all|keylayout|klc|xkb_keymap|xkb_symbols|svg)
-                \\                      Keyboard drivers to generate, default all.
-                \\  --angle-mod         Apply angle-mod, which is a [ZXCVB] permutation with the
-                \\                      LSGT key (a.k.a. ISO key).
-                \\  --qwerty-shortcuts  Keep shortcuts at their Qwerty location.
-                \\  --geometry=(ISO|ANSI|ERGO|ABNT|JIS|ALT)
-                \\                      Specify keyboard geometry, default ISO.
-                \\  --altgr             Set an AltGr layer.
-                \\  --1dk               Set a custom dead key.
-                \\  -h --help           Show this screen.
-                \\  --version           Show version.
+                \\  -h --help               Show this screen.
+                \\  --version               Show version.
                 \\
             );
         },
@@ -39,8 +30,7 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
             try writer.writeAll(
                 \\Convert TOML/YAML descriptions into OS-specific keyboard drivers.
                 \\
-                \\Usage:
-                \\  kalamine build <file> [--out=(all)] [--angle-mod] [--qwerty-shortcuts] [-h | --help]
+                \\Usage: kalamine build <file> [options]
                 \\
                 \\Options:
                 \\  --out=(all|keylayout|klc|xkb_keymap|xkb_symbols|svg)
@@ -56,8 +46,7 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
             try writer.writeAll(
                 \\Create a new TOML layout description.
                 \\
-                \\Usage:
-                \\  kalamine new <output_file> [--geometry=(ISO)] [--altgr] [--1dk] [-h | --help]
+                \\Usage: kalamine new <output_file> [options]
                 \\
                 \\Options:
                 \\  --geometry=(ISO|ANSI|ERGO|ABNT|JIS|ALT)
@@ -72,8 +61,7 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
             try writer.writeAll(
                 \\Watch a layout description file and display it in a web browser.
                 \\
-                \\Usage:
-                \\  kalamine watch <file> [--angle-mod] [-h | --help]
+                \\Usage: kalamine watch <file> [options]
                 \\
                 \\Options:
                 \\  --angle-mod  Apply angle-mod, which is a [ZXCVB] permutation with the LSGT key

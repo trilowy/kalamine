@@ -6,7 +6,6 @@ const build = @import("command/build.zig");
 const new = @import("command/new.zig");
 const watch = @import("command/watch.zig");
 const version = @import("command/version.zig");
-const CliError = @import("cli/error.zig").CliError;
 
 pub fn main() u8 {
     var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
@@ -29,7 +28,7 @@ pub fn main() u8 {
         switch (err) {
             error.ErrorReported => return 1,
             else => {
-                std.log.err("{s}", .{@errorName(err)}); // TODO: see what it does, stderr?
+                std.log.err("{s}", .{@errorName(err)});
                 return 1;
             },
         };
@@ -43,33 +42,18 @@ fn execute(
     stdout: *std.Io.Writer,
     stderr: *std.Io.Writer,
 ) !void {
-    var arg_parser = ArgParser{ .args = args };
-
-    // TODO: https://github.com/Hejsil/dipm/blob/4b24131e2b010ef8577fb650ca39d2305e6b3b4e/src/main.zig#L73
     const cmd = cli.parse(args) catch |err| {
         switch (err) {
-            CliError.MissingArg => {
-                try stderr.writeAll(
-                    \\kalamine: missing option
-                    \\Try 'kalamine --help' for more information.
-                    \\
-                );
-            },
-            CliError.UnknownCommand,
-            CliError.WrongArgValue,
-            => {
+            cli.Error.InvalidArgument => {
                 try stderr.writeAll(
                     \\kalamine: invalid option
                     \\Try 'kalamine --help' for more information.
                     \\
                 );
             },
-            CliError.DuplicatedArg => {
-                try stderr.writeAll("kalamine: duplicated option\n");
-            },
         }
         try stderr.flush();
-        return err;
+        return error.ErrorReported;
     };
 
     switch (cmd) {
@@ -83,7 +67,7 @@ fn execute(
             // TODO: to implement
             try stdout.writeAll("new command not yet implemented\n");
             try stdout.flush();
-            try new.run(options); // TODO: handle error
+            try new.run(allocator, options); // TODO: handle error
         },
         .watch => |options| {
             // TODO: to implement
@@ -100,24 +84,8 @@ fn execute(
     }
 }
 
-const main_usage =
-    \\Usage: kalamine [command] [options]
-    \\
-    \\Commands:
-    \\  build <file> [options]  Convert TOML/YAML descriptions into OS-specific keyboard drivers.
-    \\  new <file> [options]    Create a new TOML layout description.
-    \\  watch <file> [options]  Watch a layout description file and display it in a web browser.
-    \\
-    \\Options:
-    \\  -h --help               Show this screen.
-    \\  --version               Show version.
-    \\
-;
-
-// Run all tests of all modules
+// Run all tests of all modules added here
 test {
     _ = @import("cli/cli.zig");
-    _ = @import("cli/build_parser.zig");
-    _ = @import("cli/new_parser.zig");
-    _ = @import("cli/watch_parser.zig");
+    _ = @import("cli/ArgParser.zig");
 }

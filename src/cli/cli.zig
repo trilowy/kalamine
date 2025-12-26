@@ -1,98 +1,294 @@
 const std = @import("std");
-const build_parser = @import("build_parser.zig");
-const new_parser = @import("new_parser.zig");
-const watch_parser = @import("watch_parser.zig");
+const ArgParser = @import("ArgParser.zig");
+const Command = @import("../command/command.zig").Command;
 const build = @import("../command/build.zig");
 const new = @import("../command/new.zig");
 const watch = @import("../command/watch.zig");
-const Command = @import("../command/command.zig").Command;
-const CliError = @import("error.zig").CliError;
+const Geometry = @import("../layout/layout.zig").Geometry;
 
-pub const ParseOptions = struct {
-    diagnostic: ?*Diagnostic = null,
-};
+/// Parse program arguments
+pub fn parse(args: []const []const u8) Error!Command {
+    var arg_parser = ArgParser{ .args = args[1..] };
 
-pub const Diagnostic = struct {
-    arg: []const u8 = "",
-
-    pub fn report(self: Diagnostic, writer: *std.Io.Writer, err: anyerror) !void {
-        switch (err) {
-            CliError.MissingArg => {
-                try writer.writeAll(
-                    \\kalamine: missing option
-                    \\Try 'kalamine --help' for more information.
-                    \\
-                );
-            },
-            CliError.UnknownCommand,
-            CliError.WrongArgValue,
-            => {
-                try writer.print(
-                    \\kalamine: invalid option '{s}'
-                    \\Try 'kalamine --help' for more information.
-                    \\
-                , .{self.arg});
-            },
-            CliError.DuplicatedArg => {
-                try writer.writeAll("kalamine: duplicated option\n");
-            },
-            else => try writer.print("kalamine: while parsing arguments: {s}\n", .{@errorName(err)}),
+    if (arg_parser.next()) {
+        if (arg_parser.flag(&.{"build"})) {
+            return parseBuild(&arg_parser);
         }
-        try writer.flush();
+        if (arg_parser.flag(&.{"new"})) {
+            return parseNew(&arg_parser);
+        }
+        if (arg_parser.flag(&.{"watch"})) {
+            return parseWatch(&arg_parser);
+        }
+        if (arg_parser.flag(&.{"--version"})) {
+            return .version;
+        }
+        if (arg_parser.flag(&.{ "-h", "--help" })) {
+            return .{ .help = .global };
+        }
     }
-};
 
-pub fn parse(args: []const []const u8, parse_options: ParseOptions) CliError!Command {
-    // Must at least have one arg for the command
-    const action = if (args.len > 1) args[1] else {
-        return CliError.MissingArg;
-    };
+    return Error.InvalidArgument;
+}
 
-    const options = args[2..];
+fn parseBuild(arg_parser: *ArgParser) Error!Command {
+    var file: ?[]const u8 = null;
+    var out: build.Out = .all;
+    var angle_mod = false;
+    var qwerty_shortcuts = false;
 
-    if (std.mem.eql(u8, action, "build")) {
-        if (isHelp(options)) {
+    while (arg_parser.next()) {
+        if (arg_parser.flag(&.{ "-h", "--help" })) {
             return .{ .help = .build };
         }
-        const build_options = try build_parser.parse(options);
-        return .{ .build = build_options };
-    } else if (std.mem.eql(u8, action, "new")) {
-        if (isHelp(options)) {
-            return .{ .help = .new };
+        if (arg_parser.flag(&.{"--angle-mod"})) {
+            angle_mod = true;
         }
-        const new_options = try new_parser.parse(options);
-        return .{ .new = new_options };
-    } else if (std.mem.eql(u8, action, "watch")) {
-        if (isHelp(options)) {
-            return .{ .help = .watch };
+        if (arg_parser.flag(&.{"--qwerty-shortcuts"})) {
+            qwerty_shortcuts = true;
         }
-        const watch_options = try watch_parser.parse(options);
-        return .{ .watch = watch_options };
-    } else if (std.mem.eql(u8, action, "--version")) {
-        return .version;
-    } else if (std.mem.eql(u8, action, "--help") or std.mem.eql(u8, action, "-h")) {
-        return .{ .help = .global };
-    } else {
-        if (parse_options.diagnostic) |diagnostic| {
-            diagnostic.*.arg = action;
+        if (arg_parser.option(&.{"--out"})) |out_value| {
+            out = std.meta.stringToEnum(build.Out, out_value) orelse {
+                return Error.InvalidArgument;
+            };
         }
-        return CliError.UnknownCommand;
+        if (arg_parser.positional()) |file_value| {
+            file = file_value;
+        }
     }
+
+    if (file == null) {
+        return Error.InvalidArgument;
+    }
+
+    return .{ .build = build.Options{
+        .file = file.?,
+        .out = out,
+        .angle_mod = angle_mod,
+        .qwerty_shortcuts = qwerty_shortcuts,
+    } };
 }
 
-fn isHelp(args: []const []const u8) bool {
-    return args.len == 1 and (std.mem.eql(u8, args[0], "-h") or std.mem.eql(u8, args[0], "--help"));
+fn parseNew(arg_parser: *ArgParser) Error!Command {
+    var output_file: ?[]const u8 = null;
+    var geometry: Geometry = .ISO;
+    var altgr = false;
+    var odk = false;
+
+    while (arg_parser.next()) {
+        if (arg_parser.flag(&.{ "-h", "--help" })) {
+            return .{ .help = .new };
+        }
+        if (arg_parser.flag(&.{"--altgr"})) {
+            altgr = true;
+        }
+        if (arg_parser.flag(&.{"--1dk"})) {
+            odk = true;
+        }
+        if (arg_parser.option(&.{"--geometry"})) |geometry_value| {
+            geometry = std.meta.stringToEnum(Geometry, geometry_value) orelse {
+                return Error.InvalidArgument;
+            };
+        }
+        if (arg_parser.positional()) |output_file_value| {
+            output_file = output_file_value;
+        }
+    }
+
+    if (output_file == null) {
+        return Error.InvalidArgument;
+    }
+
+    return .{ .new = new.Options{
+        .output_file = output_file.?,
+        .geometry = geometry,
+        .altgr = altgr,
+        .odk = odk,
+    } };
 }
+
+fn parseWatch(arg_parser: *ArgParser) Error!Command {
+    var file: ?[]const u8 = null;
+    var angle_mod = false;
+
+    while (arg_parser.next()) {
+        if (arg_parser.flag(&.{ "-h", "--help" })) {
+            return .{ .help = .watch };
+        }
+        if (arg_parser.flag(&.{"--angle-mod"})) {
+            angle_mod = true;
+        }
+        if (arg_parser.positional()) |file_value| {
+            file = file_value;
+        }
+    }
+
+    if (file == null) {
+        return Error.InvalidArgument;
+    }
+
+    return .{ .watch = watch.Options{
+        .file = file.?,
+        .angle_mod = angle_mod,
+    } };
+}
+
+pub const Error = error{
+    InvalidArgument,
+};
 
 test "parse missing arg" {
     const args = [_][]const u8{"kalamine"};
-    const result = parse(&args);
-    try std.testing.expectEqual(CliError.MissingArg, result);
+    try std.testing.expectEqual(Error.InvalidArgument, parse(&args));
 }
 
-test "parse build all args" {
+test "parse build -h" {
+    const args = [_][]const u8{ "kalamine", "build", "-h" };
+    try std.testing.expectEqual(Command{ .help = .build }, parse(&args));
+}
+
+test "parse build --help" {
+    const args = [_][]const u8{ "kalamine", "build", "--help" };
+    try std.testing.expectEqual(Command{ .help = .build }, parse(&args));
+}
+
+test "parse build no arg" {
+    const args = [_][]const u8{ "kalamine", "build" };
+    try std.testing.expectEqual(Error.InvalidArgument, parse(&args));
+}
+
+test "parse build no file" {
+    const args = [_][]const u8{ "kalamine", "build", "--angle-mod" };
+    try std.testing.expectEqual(Error.InvalidArgument, parse(&args));
+}
+
+test "parse build wrong --out value" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=wrong" };
+    try std.testing.expectEqual(Error.InvalidArgument, parse(&args));
+}
+
+test "parse build file" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file" };
+    try std.testing.expectEqual(
+        Command{
+            .build = build.Options{
+                .file = "/test/file",
+                .out = .all,
+                .angle_mod = false,
+                .qwerty_shortcuts = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse build file --angle-mod" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--angle-mod" };
+    try std.testing.expectEqual(
+        Command{
+            .build = build.Options{
+                .file = "/test/file",
+                .out = .all,
+                .angle_mod = true,
+                .qwerty_shortcuts = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse build file --qwerty-shortcuts" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--qwerty-shortcuts" };
+    try std.testing.expectEqual(
+        Command{
+            .build = build.Options{
+                .file = "/test/file",
+                .out = .all,
+                .angle_mod = false,
+                .qwerty_shortcuts = true,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse build file --out=keylayout" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=keylayout" };
+    try std.testing.expectEqual(
+        Command{
+            .build = build.Options{
+                .file = "/test/file",
+                .out = .keylayout,
+                .angle_mod = false,
+                .qwerty_shortcuts = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse build file --out=klc" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=klc" };
+    try std.testing.expectEqual(
+        Command{
+            .build = build.Options{
+                .file = "/test/file",
+                .out = .klc,
+                .angle_mod = false,
+                .qwerty_shortcuts = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse build file --out=xkb_keymap" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=xkb_keymap" };
+    try std.testing.expectEqual(
+        Command{
+            .build = build.Options{
+                .file = "/test/file",
+                .out = .xkb_keymap,
+                .angle_mod = false,
+                .qwerty_shortcuts = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse build file --out=xkb_symbols" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=xkb_symbols" };
+    try std.testing.expectEqual(
+        Command{
+            .build = build.Options{
+                .file = "/test/file",
+                .out = .xkb_symbols,
+                .angle_mod = false,
+                .qwerty_shortcuts = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse build file --out=svg" {
+    const args = [_][]const u8{ "kalamine", "build", "/test/file", "--out=svg" };
+    try std.testing.expectEqual(
+        Command{
+            .build = build.Options{
+                .file = "/test/file",
+                .out = .svg,
+                .angle_mod = false,
+                .qwerty_shortcuts = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse build file all args" {
     const args = [_][]const u8{ "kalamine", "build", "/test/file", "--angle-mod", "--qwerty-shortcuts", "--out=all" };
-    const result = parse(&args);
     try std.testing.expectEqual(
         Command{
             .build = build.Options{
@@ -102,37 +298,187 @@ test "parse build all args" {
                 .qwerty_shortcuts = true,
             },
         },
-        result,
+        parse(&args),
     );
 }
 
-test "parse build -h" {
-    const args = [_][]const u8{ "kalamine", "build", "-h" };
-    const result = parse(&args);
-    try std.testing.expectEqual(Command{ .help = .build }, result);
+test "parse build file all args in another order" {
+    const args = [_][]const u8{ "kalamine", "build", "--out=all", "--angle-mod", "/test/file", "--qwerty-shortcuts" };
+    try std.testing.expectEqual(
+        Command{
+            .build = build.Options{
+                .file = "/test/file",
+                .out = .all,
+                .angle_mod = true,
+                .qwerty_shortcuts = true,
+            },
+        },
+        parse(&args),
+    );
 }
 
-test "parse build --help" {
-    const args = [_][]const u8{ "kalamine", "build", "--help" };
-    const result = parse(&args);
-    try std.testing.expectEqual(Command{ .help = .build }, result);
+test "parse new -h" {
+    const args = [_][]const u8{ "kalamine", "new", "-h" };
+    try std.testing.expectEqual(Command{ .help = .new }, parse(&args));
 }
 
-test "parse build -h with to many arg" {
-    const args = [_][]const u8{ "kalamine", "build", "-h", "wrong" };
-    const result = parse(&args);
-    try std.testing.expectEqual(CliError.DuplicatedArg, result);
+test "parse new --help" {
+    const args = [_][]const u8{ "kalamine", "new", "--help" };
+    try std.testing.expectEqual(Command{ .help = .new }, parse(&args));
 }
 
-test "parse build --help with to many arg" {
-    const args = [_][]const u8{ "kalamine", "build", "--help", "wrong" };
-    const result = parse(&args);
-    try std.testing.expectEqual(CliError.DuplicatedArg, result);
+test "parse new no arg" {
+    const args = [_][]const u8{ "kalamine", "new" };
+    try std.testing.expectEqual(Error.InvalidArgument, parse(&args));
 }
 
-test "parse new all args" {
+test "parse new no output file" {
+    const args = [_][]const u8{ "kalamine", "new", "--altgr" };
+    try std.testing.expectEqual(Error.InvalidArgument, parse(&args));
+}
+
+test "parse new wrong --geometry value" {
+    const args = [_][]const u8{ "kalamine", "new", "/test/file", "--geometry=wrong" };
+    try std.testing.expectEqual(Error.InvalidArgument, parse(&args));
+}
+
+test "parse new output file" {
+    const args = [_][]const u8{ "kalamine", "new", "/test/file" };
+    try std.testing.expectEqual(
+        Command{
+            .new = new.Options{
+                .output_file = "/test/file",
+                .geometry = .ISO,
+                .altgr = false,
+                .odk = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse new file --altgr" {
+    const args = [_][]const u8{ "kalamine", "new", "/test/file", "--altgr" };
+    try std.testing.expectEqual(
+        Command{
+            .new = new.Options{
+                .output_file = "/test/file",
+                .geometry = .ISO,
+                .altgr = true,
+                .odk = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse new file --1dk" {
+    const args = [_][]const u8{ "kalamine", "new", "/test/file", "--1dk" };
+    try std.testing.expectEqual(
+        Command{
+            .new = new.Options{
+                .output_file = "/test/file",
+                .geometry = .ISO,
+                .altgr = false,
+                .odk = true,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse new file --geometry=ISO" {
+    const args = [_][]const u8{ "kalamine", "new", "/test/file", "--geometry=ISO" };
+    try std.testing.expectEqual(
+        Command{
+            .new = new.Options{
+                .output_file = "/test/file",
+                .geometry = .ISO,
+                .altgr = false,
+                .odk = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse new file --geometry=ANSI" {
+    const args = [_][]const u8{ "kalamine", "new", "/test/file", "--geometry=ANSI" };
+    try std.testing.expectEqual(
+        Command{
+            .new = new.Options{
+                .output_file = "/test/file",
+                .geometry = .ANSI,
+                .altgr = false,
+                .odk = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse new file --geometry=ERGO" {
+    const args = [_][]const u8{ "kalamine", "new", "/test/file", "--geometry=ERGO" };
+    try std.testing.expectEqual(
+        Command{
+            .new = new.Options{
+                .output_file = "/test/file",
+                .geometry = .ERGO,
+                .altgr = false,
+                .odk = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse new file --geometry=ABNT" {
+    const args = [_][]const u8{ "kalamine", "new", "/test/file", "--geometry=ABNT" };
+    try std.testing.expectEqual(
+        Command{
+            .new = new.Options{
+                .output_file = "/test/file",
+                .geometry = .ABNT,
+                .altgr = false,
+                .odk = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse new file --geometry=JIS" {
+    const args = [_][]const u8{ "kalamine", "new", "/test/file", "--geometry=JIS" };
+    try std.testing.expectEqual(
+        Command{
+            .new = new.Options{
+                .output_file = "/test/file",
+                .geometry = .JIS,
+                .altgr = false,
+                .odk = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse new file --geometry=ALT" {
+    const args = [_][]const u8{ "kalamine", "new", "/test/file", "--geometry=ALT" };
+    try std.testing.expectEqual(
+        Command{
+            .new = new.Options{
+                .output_file = "/test/file",
+                .geometry = .ALT,
+                .altgr = false,
+                .odk = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse new file all args" {
     const args = [_][]const u8{ "kalamine", "new", "/test/file", "--altgr", "--1dk", "--geometry=ISO" };
-    const result = parse(&args);
     try std.testing.expectEqual(
         Command{
             .new = new.Options{
@@ -142,37 +488,74 @@ test "parse new all args" {
                 .odk = true,
             },
         },
-        result,
+        parse(&args),
     );
 }
 
-test "parse new -h" {
-    const args = [_][]const u8{ "kalamine", "new", "-h" };
-    const result = parse(&args);
-    try std.testing.expectEqual(Command{ .help = .new }, result);
+test "parse new file all args in another order" {
+    const args = [_][]const u8{ "kalamine", "new", "--geometry=ISO", "--altgr", "/test/file", "--1dk" };
+    try std.testing.expectEqual(
+        Command{
+            .new = new.Options{
+                .output_file = "/test/file",
+                .geometry = .ISO,
+                .altgr = true,
+                .odk = true,
+            },
+        },
+        parse(&args),
+    );
+}
+test "parse new all args" {
+    const args = [_][]const u8{ "kalamine", "new", "/test/file", "--altgr", "--1dk", "--geometry=ISO" };
+    try std.testing.expectEqual(
+        Command{
+            .new = new.Options{
+                .output_file = "/test/file",
+                .geometry = .ISO,
+                .altgr = true,
+                .odk = true,
+            },
+        },
+        parse(&args),
+    );
 }
 
-test "parse new --help" {
-    const args = [_][]const u8{ "kalamine", "new", "--help" };
-    const result = parse(&args);
-    try std.testing.expectEqual(Command{ .help = .new }, result);
+test "parse watch -h" {
+    const args = [_][]const u8{ "kalamine", "watch", "-h" };
+    try std.testing.expectEqual(Command{ .help = .watch }, parse(&args));
 }
 
-test "parse new -h with to many arg" {
-    const args = [_][]const u8{ "kalamine", "new", "-h", "wrong" };
-    const result = parse(&args);
-    try std.testing.expectEqual(CliError.DuplicatedArg, result);
+test "parse watch --help" {
+    const args = [_][]const u8{ "kalamine", "watch", "--help" };
+    try std.testing.expectEqual(Command{ .help = .watch }, parse(&args));
 }
 
-test "parse new --help with to many arg" {
-    const args = [_][]const u8{ "kalamine", "new", "--help", "wrong" };
-    const result = parse(&args);
-    try std.testing.expectEqual(CliError.DuplicatedArg, result);
+test "parse watch no arg" {
+    const args = [_][]const u8{ "kalamine", "watch" };
+    try std.testing.expectEqual(Error.InvalidArgument, parse(&args));
 }
 
-test "parse watch all args" {
+test "parse watch no file" {
+    const args = [_][]const u8{ "kalamine", "watch", "--angle-mod" };
+    try std.testing.expectEqual(Error.InvalidArgument, parse(&args));
+}
+
+test "parse watch file" {
+    const args = [_][]const u8{ "kalamine", "watch", "/test/file" };
+    try std.testing.expectEqual(
+        Command{
+            .watch = watch.Options{
+                .file = "/test/file",
+                .angle_mod = false,
+            },
+        },
+        parse(&args),
+    );
+}
+
+test "parse watch file all args" {
     const args = [_][]const u8{ "kalamine", "watch", "/test/file", "--angle-mod" };
-    const result = parse(&args);
     try std.testing.expectEqual(
         Command{
             .watch = watch.Options{
@@ -180,54 +563,39 @@ test "parse watch all args" {
                 .angle_mod = true,
             },
         },
-        result,
+        parse(&args),
     );
 }
 
-test "parse watch -h" {
-    const args = [_][]const u8{ "kalamine", "watch", "-h" };
-    const result = parse(&args);
-    try std.testing.expectEqual(Command{ .help = .watch }, result);
-}
-
-test "parse watch --help" {
-    const args = [_][]const u8{ "kalamine", "watch", "--help" };
-    const result = parse(&args);
-    try std.testing.expectEqual(Command{ .help = .watch }, result);
-}
-
-test "parse watch -h with to many arg" {
-    const args = [_][]const u8{ "kalamine", "watch", "-h", "wrong" };
-    const result = parse(&args);
-    try std.testing.expectEqual(CliError.DuplicatedArg, result);
-}
-
-test "parse watch --help with to many arg" {
-    const args = [_][]const u8{ "kalamine", "watch", "--help", "wrong" };
-    const result = parse(&args);
-    try std.testing.expectEqual(CliError.DuplicatedArg, result);
+test "parse watch file all args in another order" {
+    const args = [_][]const u8{ "kalamine", "watch", "--angle-mod", "/test/file" };
+    try std.testing.expectEqual(
+        Command{
+            .watch = watch.Options{
+                .file = "/test/file",
+                .angle_mod = true,
+            },
+        },
+        parse(&args),
+    );
 }
 
 test "parse --version" {
     const args = [_][]const u8{ "kalamine", "--version" };
-    const result = parse(&args);
-    try std.testing.expectEqual(.version, result);
+    try std.testing.expectEqual(.version, parse(&args));
 }
 
 test "parse --help" {
     const args = [_][]const u8{ "kalamine", "--help" };
-    const result = parse(&args);
-    try std.testing.expectEqual(Command{ .help = .global }, result);
+    try std.testing.expectEqual(Command{ .help = .global }, parse(&args));
 }
 
 test "parse -h" {
     const args = [_][]const u8{ "kalamine", "-h" };
-    const result = parse(&args);
-    try std.testing.expectEqual(Command{ .help = .global }, result);
+    try std.testing.expectEqual(Command{ .help = .global }, parse(&args));
 }
 
 test "parse unknown" {
     const args = [_][]const u8{ "kalamine", "unknown" };
-    const result = parse(&args);
-    try std.testing.expectEqual(CliError.UnknownCommand, result);
+    try std.testing.expectEqual(Error.InvalidArgument, parse(&args));
 }
