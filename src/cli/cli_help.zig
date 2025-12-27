@@ -37,7 +37,7 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
                 \\                      Keyboard drivers to generate, default all.
                 \\  --angle-mod         Apply angle-mod, which is a [ZXCVB] permutation with the
                 \\                      LSGT key (a.k.a. ISO key).
-                \\  --qwerty-shortcuts  Keep shortcuts at their Qwerty location.
+                \\  --qwerty-shortcuts  Keep shortcuts at their QWERTY location.
                 \\  -h --help           Show this screen.
                 \\
             );

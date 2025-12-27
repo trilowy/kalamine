@@ -57,7 +57,7 @@ pub fn run(allocator: std.mem.Allocator, options: Options) !void {
     // TODO: kalamine/help.py:96 web scan codes
 }
 
-/// Create a dummy (Qwerty) layout with the given characteristics
+/// Create a dummy (QWERTY) layout with the given characteristics
 fn dummyLayout(allocator: std.mem.Allocator, options: *const Options) !KeyboardLayout {
     var file_content = std.ArrayList(u8).empty;
     defer file_content.deinit(allocator);
