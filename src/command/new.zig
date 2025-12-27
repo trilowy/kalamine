@@ -2,7 +2,7 @@ const std = @import("std");
 const layout = @import("../layout/layout.zig");
 const Geometry = layout.Geometry;
 const KeyboardLayout = layout.KeyboardLayout;
-const toml_output = @import("../output/toml.zig");
+const toml_generator = @import("../generator/toml.zig");
 
 pub const Options = struct {
     output_file: []const u8,
@@ -38,7 +38,7 @@ pub fn run(allocator: std.mem.Allocator, options: Options) !void {
     // TODO: kalamine/help.py:145
     // TODO: kalamine/help.py:111
     // const base = if (options.odk) dummy_odk_layout else dummy_alpha_layout;
-    const base = try toml_output.getBase(allocator, &keyboard_layout);
+    const base = try toml_generator.getBase(allocator, &keyboard_layout);
     defer allocator.free(base);
 
     try stdout.print(dummy_layer, .{ "base", base });
@@ -46,7 +46,7 @@ pub fn run(allocator: std.mem.Allocator, options: Options) !void {
     if (options.altgr) {
         // TODO:
         // try stdout.print(dummy_layer, .{ "altgr", dummy_altgr_layout });
-        const altgr = try toml_output.getAltgr(allocator, &keyboard_layout);
+        const altgr = try toml_generator.getAltgr(allocator, &keyboard_layout);
         defer allocator.free(altgr);
 
         try stdout.print(dummy_layer, .{ "altgr", altgr });
@@ -80,7 +80,7 @@ const dummy_metadata =
     \\# kalamine keyboard layout descriptor
     \\name        = "Qwerty-custom"  # full layout name, displayed in the keyboard settings
     \\name8       = "custom"         # short Windows filename: no spaces, no special chars
-    \\locale      = "us"             # locale/language id
+    \\locale      = "en-US"          # locale/language id
     \\variant     = "custom"         # layout variant id
     \\author      = "nobody"         # author name
     \\description = "Custom QWERTY layout"
