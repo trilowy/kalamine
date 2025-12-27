@@ -32,7 +32,7 @@ pub const Geometry = enum {
     }
 };
 
-const Layer = enum {
+pub const Layer = enum {
     base,
     shift,
     odk,
@@ -359,7 +359,7 @@ pub const KeyboardLayout = struct {
 // tips of why it might not match: spaces at the beginning of the line
 // row and column where it does not match
 
-const RowDescription = struct {
+pub const RowDescription = struct {
     offset: usize,
     keys: []const KeyCode,
 };
@@ -434,7 +434,6 @@ const iso_template =
     \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
     \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
     \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
-    \\
 ;
 
 const iso_rows = [_]RowDescription{
@@ -473,7 +472,6 @@ const ansi_template =
     \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
     \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl  ┃
     \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
-    \\
 ;
 
 const ansi_rows = [_]RowDescription{
@@ -509,7 +507,6 @@ const ergo_template =
     \\┆     ┃     │     │     │     │     ┃     │     │     │     │     ┃
     \\┆     ┃     │     │     │     │     ┃     │     │     │     │     ┃
     \\╰╌╌╌╌╌┸─────┴─────┴─────┴─────┴─────┸─────┴─────┴─────┴─────┴─────┚
-    \\
 ;
 
 const ergo_rows = [_]RowDescription{
@@ -548,7 +545,6 @@ const abnt_template =
     \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
     \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
     \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
-    \\
 ;
 
 const abnt_rows = [_]RowDescription{
@@ -587,7 +583,6 @@ const jis_template =
     \\┃       ┃       ┃       ┃     ┃              ┃     ┃     ┃       ┃       ┃       ┃        ┃
     \\┃ Ctrl  ┃ super ┃ Alt   ┃ NC. ┃ ␣            ┃ C.  ┃ K.  ┃ Alt   ┃ super ┃ menu  ┃ Ctrl   ┃
     \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━┹──────────────┺━━━━━┻━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━━┛
-    \\
 ;
 
 const jis_rows = [_]RowDescription{
@@ -626,7 +621,6 @@ const alt_template =
     \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃        ┃
     \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl   ┃
     \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━━┛
-    \\
 ;
 
 const alt_rows = [_]RowDescription{
