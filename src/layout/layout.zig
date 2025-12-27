@@ -74,20 +74,35 @@ pub const ParseOptions = struct {
 
 pub const Diagnostic = struct {
     arg: []const u8 = "",
+    line: usize = 0,
+    column: usize = 0,
 
-    pub fn report(self: Diagnostic, writer: *std.Io.Writer, err: anyerror) !void {
+    pub fn report(self: Diagnostic, writer: *std.Io.Writer, err: anyerror) anyerror {
         switch (err) {
-            LayoutParsingError.MissingAttribute => {
+            ParsingError.MissingAttribute => {
                 try writer.print("kalamine: parse error: missing mandatory '{s}' attribute\n", .{self.arg});
                 try writer.flush();
+                return error.ErrorReported;
             },
-            else => {},
+            ParsingError.MissingLayout => {
+                try writer.writeAll("kalamine: parse error: missing mandatory layout 'full' or 'base'\n");
+                try writer.flush();
+                return error.ErrorReported;
+            },
+            ParsingError.WrongValue => {
+                try writer.print("kalamine: parse error: wrong value in layout '{s}', line {d}, column {d}\n", .{ self.arg, self.line, self.column });
+                try writer.flush();
+                return error.ErrorReported;
+            },
+            else => return err,
         }
     }
 };
 
-const LayoutParsingError = error{
+pub const ParsingError = error{
     MissingAttribute,
+    MissingLayout,
+    WrongValue,
 };
 
 pub const KeyboardLayout = struct {
@@ -111,6 +126,8 @@ pub const KeyboardLayout = struct {
     version: ?[]const u8,
     geometry: Geometry,
     layers: std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []u8)),
+    has_altgr: bool = false,
+    has_1dk: bool = false,
 
     /// Deinitialize with `deinit`
     /// In case of error, deinitialize the error message if present in options
@@ -141,7 +158,7 @@ pub const KeyboardLayout = struct {
             try arena.dupe(u8, name)
         else {
             if (options.diagnostic) |diag| diag.arg = "name";
-            return LayoutParsingError.MissingAttribute;
+            return ParsingError.MissingAttribute;
         };
 
         const name8 = if (parsed_toml.name8) |name8|
@@ -183,7 +200,7 @@ pub const KeyboardLayout = struct {
             geometry
         else {
             if (options.diagnostic) |diag| diag.arg = "geometry";
-            return LayoutParsingError.MissingAttribute;
+            return ParsingError.MissingAttribute;
         };
 
         var layers = std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []u8)).empty;
@@ -191,7 +208,7 @@ pub const KeyboardLayout = struct {
             try layers.put(arena, layer, std.AutoHashMapUnmanaged(KeyCode, []u8).empty);
         }
 
-        return KeyboardLayout{
+        var keyboard_layout = KeyboardLayout{
             .arena_allocator = arena_allocator,
             .name = name,
             .name8 = name8,
@@ -204,6 +221,34 @@ pub const KeyboardLayout = struct {
             .geometry = geometry,
             .layers = layers,
         };
+
+        const rows = keyboard_layout.geometry.getKeys();
+
+        if (parsed_toml.full) |full_to_parse| {
+            if (options.diagnostic) |diag| diag.arg = "full";
+            try keyboard_layout.parseTemplate(full_to_parse, &rows, Layer.base, options);
+            try keyboard_layout.parseTemplate(full_to_parse, &rows, Layer.altgr, options);
+            keyboard_layout.has_altgr = true;
+            if (options.diagnostic) |diag| diag.arg = "";
+        } else if (parsed_toml.base) |base_to_parse| {
+            if (options.diagnostic) |diag| diag.arg = "base";
+            try keyboard_layout.parseTemplate(base_to_parse, &rows, Layer.base, options);
+            try keyboard_layout.parseTemplate(base_to_parse, &rows, Layer.odk, options);
+
+            if (parsed_toml.altgr) |altgr_to_parse| {
+                if (options.diagnostic) |diag| diag.arg = "altgr";
+                try keyboard_layout.parseTemplate(altgr_to_parse, &rows, Layer.altgr, options);
+                keyboard_layout.has_altgr = true;
+            }
+            if (options.diagnostic) |diag| diag.arg = "";
+        } else {
+            return ParsingError.MissingLayout;
+        }
+
+        // TODO: kalamine/layout.py:192
+        // all other missing features like space bar or angle-mod
+
+        return keyboard_layout;
     }
 
     pub fn deinit(self: *KeyboardLayout) void {
@@ -213,48 +258,98 @@ pub const KeyboardLayout = struct {
 
     /// Extract a keyboard layer from a template
     fn parseTemplate(
-        allocator: std.mem.Allocator,
-        template: []const []const u8,
+        self: *KeyboardLayout,
+        template_lines: []const u8,
         rows: []const RowDescription,
         layer: Layer,
+        options: ParseOptions,
     ) !void {
-        var j = 0;
-        const col_offset = if (layer == .base) 0 else 2;
+        var template = std.mem.splitScalar(u8, template_lines, '\n');
+        const arena = self.arena_allocator.allocator();
+
+        var j: usize = 0;
+        const col_offset: usize = if (layer == .base) 0 else 2;
+
         for (rows) |row| {
+            defer j += 1;
+
+            if (template.next() == null) {
+                if (options.diagnostic) |diag| diag.line = j;
+                return ParsingError.WrongValue;
+            }
+
             var i = row.offset + col_offset;
 
-            const base = template[2 + j * 3];
-            const shift = template[1 + j * 3];
+            const shift = if (template.next()) |line| line else {
+                if (options.diagnostic) |diag| diag.line = j + 1;
+                return ParsingError.WrongValue;
+            };
+
+            const base = if (template.next()) |line| line else {
+                if (options.diagnostic) |diag| diag.line = j + 2;
+                return ParsingError.WrongValue;
+            };
 
             for (row.keys) |key| {
-                var base_key = if (base[i - 1] == '*') {
-                    return base[(i - 1)..(i + 1)];
-                } else {
-                    return base[i..(i + 1)];
-                };
+                defer i += 6;
 
-                const shift_key = if (base[i - 1] == '*') {
-                    return shift[(i - 1)..(i + 1)];
-                } else {
-                    return shift[i..(i + 1)];
-                };
+                const base_key = if (base[i - 1] == '*')
+                    base[(i - 1)..(i + 1)]
+                else
+                    base[i..(i + 1)];
+
+                const shift_key = if (base[i - 1] == '*')
+                    shift[(i - 1)..(i + 1)]
+                else
+                    shift[i..(i + 1)];
 
                 // In the base layer, if the base character is undefined, shift prevails
-                if (std.mem.eql(u8, base_key, " ")) {
-                    if (layer == .base) {
-                        // TODO: alloc all keys to keep them, need to free the previous base_key
-                        // Or, I can use enum for all possible values? Is it useful for driver generation?
-                        base_key = try std.ascii.allocLowerString(allocator, shift_key);
-                        // TODO: kalamine/layout.py:295
-                        _ = key; // TODO:
+                if (layer == .base and
+                    std.mem.eql(u8, base_key, " ") and
+                    !std.mem.eql(u8, shift_key, " "))
+                {
+                    const base_key_to_put = try std.ascii.allocLowerString(arena, shift_key);
+                    var layer_map = self.layers.get(layer).?;
+                    try layer_map.put(arena, key, base_key_to_put);
+
+                    const shift_key_to_put = try arena.dupe(u8, shift_key);
+                    var shifted_layer_map = self.layers.get(layer.shifted()).?;
+                    try shifted_layer_map.put(arena, key, shift_key_to_put);
+                }
+                // In other layers, if the shift character is undefined, base prevails
+                else if ((layer == .altgr or layer == .odk) and
+                    std.mem.eql(u8, shift_key, " ") and
+                    !std.mem.eql(u8, base_key, " "))
+                {
+                    const base_key_to_put = try arena.dupe(u8, base_key);
+                    var layer_map = self.layers.get(layer).?;
+                    try layer_map.put(arena, key, base_key_to_put);
+
+                    const shift_key_to_put = try std.ascii.allocUpperString(arena, base_key);
+                    var shifted_layer_map = self.layers.get(layer.shifted()).?;
+                    try shifted_layer_map.put(arena, key, shift_key_to_put);
+                } else {
+                    if (!std.mem.eql(u8, base_key, " ")) {
+                        const base_key_to_put = try arena.dupe(u8, base_key);
+                        var layer_map = self.layers.get(layer).?;
+                        try layer_map.put(arena, key, base_key_to_put);
+                    }
+
+                    if (!std.mem.eql(u8, shift_key, " ")) {
+                        const shift_key_to_put = try arena.dupe(u8, shift_key);
+                        var shifted_layer_map = self.layers.get(layer).?;
+                        try shifted_layer_map.put(arena, key, shift_key_to_put);
                     }
                 }
 
-                i += 6;
+                // TODO: kalamine/layout.py:311
+                // dead_keys set
             }
-            j += 1;
         }
     }
+
+    // TODO: kalamine/layout.py:403
+    // _get_geometry / _fill_template
 };
 
 // TODO: kalamine/layout.py:276

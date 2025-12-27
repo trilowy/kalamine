@@ -1,3 +1,5 @@
+//! Parser for CLI arguments
+
 const std = @import("std");
 const ArgParser = @import("ArgParser.zig");
 const Command = @import("../command/command.zig").Command;
