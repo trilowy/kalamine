@@ -34,7 +34,10 @@ fn getGeometry(allocator: std.mem.Allocator, keyboard_layout: *const layout.Keyb
 fn fillTemplate(template_lines: []u8, keyboard_layout: *const layout.KeyboardLayout, rows: [4]layout.RowDescription, layer: Layer) void {
     var template = std.mem.splitScalar(u8, template_lines, '\n');
 
-    const col_offset: usize, const shift_prevails = if (layer == Layer.base) .{ 0, true } else .{ 2, false };
+    const col_offset: usize, const shift_prevails = if (layer == Layer.base)
+        .{ 0, true }
+    else
+        .{ 2, false };
 
     var j: usize = 0;
 

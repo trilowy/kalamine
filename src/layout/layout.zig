@@ -1,5 +1,7 @@
 const std = @import("std");
 const toml = @import("toml");
+const LetterCasing = @import("LetterCasing");
+const Graphemes = @import("Graphemes");
 
 pub const Geometry = enum {
     ISO,
@@ -226,18 +228,18 @@ pub const KeyboardLayout = struct {
 
         if (parsed_toml.full) |full_to_parse| {
             if (options.diagnostic) |diag| diag.arg = "full";
-            try keyboard_layout.parseTemplate(full_to_parse, &rows, Layer.base, options);
-            try keyboard_layout.parseTemplate(full_to_parse, &rows, Layer.altgr, options);
+            try keyboard_layout.parseTemplate(allocator, full_to_parse, &rows, Layer.base, options);
+            try keyboard_layout.parseTemplate(allocator, full_to_parse, &rows, Layer.altgr, options);
             keyboard_layout.has_altgr = true;
             if (options.diagnostic) |diag| diag.arg = "";
         } else if (parsed_toml.base) |base_to_parse| {
             if (options.diagnostic) |diag| diag.arg = "base";
-            try keyboard_layout.parseTemplate(base_to_parse, &rows, Layer.base, options);
-            try keyboard_layout.parseTemplate(base_to_parse, &rows, Layer.odk, options);
+            try keyboard_layout.parseTemplate(allocator, base_to_parse, &rows, Layer.base, options);
+            try keyboard_layout.parseTemplate(allocator, base_to_parse, &rows, Layer.odk, options);
 
             if (parsed_toml.altgr) |altgr_to_parse| {
                 if (options.diagnostic) |diag| diag.arg = "altgr";
-                try keyboard_layout.parseTemplate(altgr_to_parse, &rows, Layer.altgr, options);
+                try keyboard_layout.parseTemplate(allocator, altgr_to_parse, &rows, Layer.altgr, options);
                 keyboard_layout.has_altgr = true;
             }
             if (options.diagnostic) |diag| diag.arg = "";
@@ -259,6 +261,7 @@ pub const KeyboardLayout = struct {
     /// Extract a keyboard layer from a template
     fn parseTemplate(
         self: *KeyboardLayout,
+        allocator: std.mem.Allocator,
         template_lines: []const u8,
         rows: []const RowDescription,
         layer: Layer,
@@ -266,6 +269,12 @@ pub const KeyboardLayout = struct {
     ) !void {
         var template = std.mem.splitScalar(u8, template_lines, '\n');
         const arena = self.arena_allocator.allocator();
+
+        const graph = try Graphemes.init(allocator);
+        defer graph.deinit(allocator);
+
+        const case = try LetterCasing.init(allocator);
+        defer case.deinit(allocator);
 
         var j: usize = 0;
         const col_offset: usize = if (layer == .base) 0 else 2;
@@ -291,6 +300,8 @@ pub const KeyboardLayout = struct {
             };
 
             for (row.keys) |key| {
+                // TODO: 6 by 6 grapheme clusters
+                // https://codeberg.org/atman/zg#grapheme-clusters
                 defer i += 6;
 
                 const base_key = if (base[i - 1] == '*')
@@ -308,7 +319,7 @@ pub const KeyboardLayout = struct {
                     std.mem.eql(u8, base_key, " ") and
                     !std.mem.eql(u8, shift_key, " "))
                 {
-                    const base_key_to_put = try std.ascii.allocLowerString(arena, shift_key);
+                    const base_key_to_put = try case.toLowerStr(arena, shift_key);
                     var layer_map = self.layers.get(layer).?;
                     try layer_map.put(arena, key, base_key_to_put);
 
@@ -325,7 +336,7 @@ pub const KeyboardLayout = struct {
                     var layer_map = self.layers.get(layer).?;
                     try layer_map.put(arena, key, base_key_to_put);
 
-                    const shift_key_to_put = try std.ascii.allocUpperString(arena, base_key);
+                    const shift_key_to_put = try case.toUpperStr(arena, base_key);
                     var shifted_layer_map = self.layers.get(layer.shifted()).?;
                     try shifted_layer_map.put(arena, key, shift_key_to_put);
                 } else {
