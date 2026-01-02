@@ -91,8 +91,27 @@ pub const Diagnostic = struct {
                 try writer.flush();
                 return error.ErrorReported;
             },
+            // TODO: see if it is still useful
             ParsingError.WrongValue => {
                 try writer.print("kalamine: parse error: wrong value in layout '{s}', line {d}, column {d}\n", .{ self.arg, self.line, self.column });
+                try writer.flush();
+                return error.ErrorReported;
+            },
+            ParsingError.WrongStructure => {
+                try writer.print(
+                    \\kalamine: parse error: wrong structure in layout '{s}', line {d}, column {d}
+                    \\See how the layout should be structured with the 'new' command
+                    \\
+                , .{ self.arg, self.line, self.column });
+                try writer.flush();
+                return error.ErrorReported;
+            },
+            ParsingError.Incomplete => {
+                try writer.writeAll(
+                    \\kalamine: parse error: layout is incomplete
+                    \\See how the layout should be structured with the 'new' command
+                    \\
+                );
                 try writer.flush();
                 return error.ErrorReported;
             },
@@ -105,6 +124,8 @@ pub const ParsingError = error{
     MissingAttribute,
     MissingLayout,
     WrongValue,
+    WrongStructure,
+    Incomplete,
 };
 
 pub const KeyboardLayout = struct {
@@ -267,96 +288,139 @@ pub const KeyboardLayout = struct {
         layer: Layer,
         options: ParseOptions,
     ) !void {
-        var template = std.mem.splitScalar(u8, template_lines, '\n');
-        const arena = self.arena_allocator.allocator();
-
+        // TODO: loop on empty template and filled template
+        // https://codeberg.org/atman/zg#grapheme-clusters
         const graph = try Graphemes.init(allocator);
         defer graph.deinit(allocator);
 
-        const case = try LetterCasing.init(allocator);
-        defer case.deinit(allocator);
+        const empty_template = self.geometry.getTemplate();
+        var empty_template_iter = graph.iterator(empty_template);
 
-        var j: usize = 0;
-        const col_offset: usize = if (layer == .base) 0 else 2;
+        var to_parse_iter = graph.iterator(template_lines);
 
-        for (rows) |row| {
-            defer j += 1;
+        var i: usize = 0;
 
-            if (template.next() == null) {
-                if (options.diagnostic) |diag| diag.line = j;
-                return ParsingError.WrongValue;
-            }
-
-            var i = row.offset + col_offset;
-
-            const shift = if (template.next()) |line| line else {
-                if (options.diagnostic) |diag| diag.line = j + 1;
-                return ParsingError.WrongValue;
-            };
-
-            const base = if (template.next()) |line| line else {
-                if (options.diagnostic) |diag| diag.line = j + 2;
-                return ParsingError.WrongValue;
-            };
-
-            for (row.keys) |key| {
-                // TODO: 6 by 6 grapheme clusters
-                // https://codeberg.org/atman/zg#grapheme-clusters
-                defer i += 6;
-
-                const base_key = if (base[i - 1] == '*')
-                    base[(i - 1)..(i + 1)]
-                else
-                    base[i..(i + 1)];
-
-                const shift_key = if (base[i - 1] == '*')
-                    shift[(i - 1)..(i + 1)]
-                else
-                    shift[i..(i + 1)];
-
-                // In the base layer, if the base character is undefined, shift prevails
-                if (layer == .base and
-                    std.mem.eql(u8, base_key, " ") and
-                    !std.mem.eql(u8, shift_key, " "))
-                {
-                    const base_key_to_put = try case.toLowerStr(arena, shift_key);
-                    var layer_map = self.layers.get(layer).?;
-                    try layer_map.put(arena, key, base_key_to_put);
-
-                    const shift_key_to_put = try arena.dupe(u8, shift_key);
-                    var shifted_layer_map = self.layers.get(layer.shifted()).?;
-                    try shifted_layer_map.put(arena, key, shift_key_to_put);
-                }
-                // In other layers, if the shift character is undefined, base prevails
-                else if ((layer == .altgr or layer == .odk) and
-                    std.mem.eql(u8, shift_key, " ") and
-                    !std.mem.eql(u8, base_key, " "))
-                {
-                    const base_key_to_put = try arena.dupe(u8, base_key);
-                    var layer_map = self.layers.get(layer).?;
-                    try layer_map.put(arena, key, base_key_to_put);
-
-                    const shift_key_to_put = try case.toUpperStr(arena, base_key);
-                    var shifted_layer_map = self.layers.get(layer.shifted()).?;
-                    try shifted_layer_map.put(arena, key, shift_key_to_put);
-                } else {
-                    if (!std.mem.eql(u8, base_key, " ")) {
-                        const base_key_to_put = try arena.dupe(u8, base_key);
-                        var layer_map = self.layers.get(layer).?;
-                        try layer_map.put(arena, key, base_key_to_put);
-                    }
-
-                    if (!std.mem.eql(u8, shift_key, " ")) {
-                        const shift_key_to_put = try arena.dupe(u8, shift_key);
-                        var shifted_layer_map = self.layers.get(layer).?;
-                        try shifted_layer_map.put(arena, key, shift_key_to_put);
-                    }
-                }
-
-                // TODO: kalamine/layout.py:311
-                // dead_keys set
+        // Skip the first line return
+        // TODO: skip last also, error if other char after that
+        if (to_parse_iter.next()) |c| {
+            if (!std.mem.eql(u8, "\n", c.bytes(template_lines))) {
+                if (options.diagnostic) |diag| diag.line = i; // TODO: better line, col, message
+                return ParsingError.WrongStructure;
             }
         }
+
+        while (empty_template_iter.next()) |tc| : (i += 1) {
+            if (to_parse_iter.next()) |c| {
+                // Empty template and parsed template should have same structure
+                if (!std.mem.eql(u8, tc.bytes(empty_template), " ") and
+                    !std.mem.eql(u8, tc.bytes(empty_template), c.bytes(template_lines)))
+                {
+                    // TODO: if empty_template not empty char, should not be different chars
+                    if (options.diagnostic) |diag| diag.line = i; // TODO: better line, col, message
+                    return ParsingError.WrongStructure;
+                }
+
+                if (!std.mem.eql(u8, tc.bytes(empty_template), c.bytes(template_lines))) {
+                    // TODO: store chars but keep position in it
+                    // std.debug.print("empty_template: '{s}'\n", .{tc.bytes(empty_template)});
+                    std.debug.print("template_lines: '{s}'\n", .{c.bytes(template_lines)});
+                    // TODO: create tests now
+                }
+            } else {
+                return ParsingError.Incomplete;
+            }
+        }
+
+        _ = rows;
+        _ = layer;
+
+        // var template = std.mem.splitScalar(u8, template_lines, '\n');
+        // const arena = self.arena_allocator.allocator();
+        //
+        // const case = try LetterCasing.init(allocator);
+        // defer case.deinit(allocator);
+        //
+        // var j: usize = 0;
+        // const col_offset: usize = if (layer == .base) 0 else 2;
+        //
+        // for (rows) |row| {
+        //     defer j += 1;
+        //
+        //     if (template.next() == null) {
+        //         if (options.diagnostic) |diag| diag.line = j;
+        //         return ParsingError.WrongValue;
+        //     }
+        //
+        //     var i = row.offset + col_offset;
+        //
+        //     const shift = if (template.next()) |line| line else {
+        //         if (options.diagnostic) |diag| diag.line = j + 1;
+        //         return ParsingError.WrongValue;
+        //     };
+        //
+        //     const base = if (template.next()) |line| line else {
+        //         if (options.diagnostic) |diag| diag.line = j + 2;
+        //         return ParsingError.WrongValue;
+        //     };
+        //
+        //     for (row.keys) |key| {
+        //         // TODO: 6 by 6 grapheme clusters
+        //         // https://codeberg.org/atman/zg#grapheme-clusters
+        //         defer i += 6;
+        //
+        //         const base_key = if (base[i - 1] == '*')
+        //             base[(i - 1)..(i + 1)]
+        //         else
+        //             base[i..(i + 1)];
+        //
+        //         const shift_key = if (base[i - 1] == '*')
+        //             shift[(i - 1)..(i + 1)]
+        //         else
+        //             shift[i..(i + 1)];
+        //
+        //         // In the base layer, if the base character is undefined, shift prevails
+        //         if (layer == .base and
+        //             std.mem.eql(u8, base_key, " ") and
+        //             !std.mem.eql(u8, shift_key, " "))
+        //         {
+        //             const base_key_to_put = try case.toLowerStr(arena, shift_key);
+        //             var layer_map = self.layers.get(layer).?;
+        //             try layer_map.put(arena, key, base_key_to_put);
+        //
+        //             const shift_key_to_put = try arena.dupe(u8, shift_key);
+        //             var shifted_layer_map = self.layers.get(layer.shifted()).?;
+        //             try shifted_layer_map.put(arena, key, shift_key_to_put);
+        //         }
+        //         // In other layers, if the shift character is undefined, base prevails
+        //         else if ((layer == .altgr or layer == .odk) and
+        //             std.mem.eql(u8, shift_key, " ") and
+        //             !std.mem.eql(u8, base_key, " "))
+        //         {
+        //             const base_key_to_put = try arena.dupe(u8, base_key);
+        //             var layer_map = self.layers.get(layer).?;
+        //             try layer_map.put(arena, key, base_key_to_put);
+        //
+        //             const shift_key_to_put = try case.toUpperStr(arena, base_key);
+        //             var shifted_layer_map = self.layers.get(layer.shifted()).?;
+        //             try shifted_layer_map.put(arena, key, shift_key_to_put);
+        //         } else {
+        //             if (!std.mem.eql(u8, base_key, " ")) {
+        //                 const base_key_to_put = try arena.dupe(u8, base_key);
+        //                 var layer_map = self.layers.get(layer).?;
+        //                 try layer_map.put(arena, key, base_key_to_put);
+        //             }
+        //
+        //             if (!std.mem.eql(u8, shift_key, " ")) {
+        //                 const shift_key_to_put = try arena.dupe(u8, shift_key);
+        //                 var shifted_layer_map = self.layers.get(layer).?;
+        //                 try shifted_layer_map.put(arena, key, shift_key_to_put);
+        //             }
+        //         }
+        //
+        //     // TODO: kalamine/layout.py:311
+        //     // dead_keys set
+        // }
+        //     }
     }
 
     // TODO: kalamine/layout.py:403
