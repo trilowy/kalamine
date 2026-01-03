@@ -76,6 +76,7 @@ pub const ParseOptions = struct {
 
 pub const Diagnostic = struct {
     arg: []const u8 = "",
+    arg2: []const u8 = "",
     line: usize = 0,
     column: usize = 0,
 
@@ -100,18 +101,10 @@ pub const Diagnostic = struct {
             ParsingError.WrongStructure => {
                 try writer.print(
                     \\kalamine: parse error: wrong structure in layout '{s}', line {d}, column {d}
+                    \\Expected: {s} found: {s}
                     \\See how the layout should be structured with the 'new' command
                     \\
-                , .{ self.arg, self.line, self.column });
-                try writer.flush();
-                return error.ErrorReported;
-            },
-            ParsingError.Incomplete => {
-                try writer.writeAll(
-                    \\kalamine: parse error: layout is incomplete
-                    \\See how the layout should be structured with the 'new' command
-                    \\
-                );
+                , .{ self.arg, self.line, self.column, self.arg, self.arg2 });
                 try writer.flush();
                 return error.ErrorReported;
             },
@@ -125,7 +118,6 @@ pub const ParsingError = error{
     MissingLayout,
     WrongValue,
     WrongStructure,
-    Incomplete,
 };
 
 pub const KeyboardLayout = struct {
@@ -283,27 +275,29 @@ pub const KeyboardLayout = struct {
     fn parseTemplate(
         self: *KeyboardLayout,
         allocator: std.mem.Allocator,
-        template_lines: []const u8,
+        layout: []const u8,
         rows: []const RowDescription,
         layer: Layer,
         options: ParseOptions,
     ) !void {
         // TODO: loop on empty template and filled template
         // https://codeberg.org/atman/zg#grapheme-clusters
+        // Loop once per TOML entry and return a structure of keys with 4 possible values
+        // Loop on this structure and copy wath is needed (and shift rule) and deinit arena of structure
         const graph = try Graphemes.init(allocator);
         defer graph.deinit(allocator);
 
         const empty_template = self.geometry.getTemplate();
         var empty_template_iter = graph.iterator(empty_template);
 
-        var to_parse_iter = graph.iterator(template_lines);
+        var to_parse_iter = graph.iterator(layout);
 
         var i: usize = 0;
 
         // Skip the first line return
         // TODO: skip last also, error if other char after that
         if (to_parse_iter.next()) |c| {
-            if (!std.mem.eql(u8, "\n", c.bytes(template_lines))) {
+            if (!std.mem.eql(u8, "\n", c.bytes(layout))) {
                 if (options.diagnostic) |diag| diag.line = i; // TODO: better line, col, message
                 return ParsingError.WrongStructure;
             }
@@ -311,19 +305,20 @@ pub const KeyboardLayout = struct {
 
         while (empty_template_iter.next()) |tc| : (i += 1) {
             if (to_parse_iter.next()) |c| {
+                const template_bytes = tc.bytes(empty_template);
                 // Empty template and parsed template should have same structure
-                if (!std.mem.eql(u8, tc.bytes(empty_template), " ") and
-                    !std.mem.eql(u8, tc.bytes(empty_template), c.bytes(template_lines)))
+                if (!std.mem.eql(u8, template_bytes, " ") and
+                    !std.mem.eql(u8, template_bytes, c.bytes(layout)))
                 {
                     // TODO: if empty_template not empty char, should not be different chars
                     if (options.diagnostic) |diag| diag.line = i; // TODO: better line, col, message
                     return ParsingError.WrongStructure;
                 }
 
-                if (!std.mem.eql(u8, tc.bytes(empty_template), c.bytes(template_lines))) {
+                if (!std.mem.eql(u8, template_bytes, c.bytes(layout))) {
                     // TODO: store chars but keep position in it
                     // std.debug.print("empty_template: '{s}'\n", .{tc.bytes(empty_template)});
-                    std.debug.print("template_lines: '{s}'\n", .{c.bytes(template_lines)});
+                    std.debug.print("template_lines: '{s}'\n", .{c.bytes(layout)});
                     // TODO: create tests now
                 }
             } else {

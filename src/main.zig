@@ -88,4 +88,5 @@ fn execute(
 test {
     _ = @import("cli/cli.zig");
     _ = @import("cli/ArgParser.zig");
+    _ = @import("layout/parser.zig");
 }
