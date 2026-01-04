@@ -108,6 +108,16 @@ pub const Diagnostic = struct {
                 try writer.flush();
                 return error.ErrorReported;
             },
+            ParsingError.CharAtBadPlace => {
+                try writer.print(
+                    \\kalamine: parse error: a character is in the wrong key in layout '{s}', line {d}, column {d}
+                    \\Expected: {s} found: {s}
+                    \\See how the layout should be structured with the 'new' command
+                    \\
+                , .{ self.arg, self.line, self.column, self.arg, self.arg2 });
+                try writer.flush();
+                return error.ErrorReported;
+            },
             else => return err,
         }
     }
@@ -118,6 +128,7 @@ pub const ParsingError = error{
     MissingLayout,
     WrongValue,
     WrongStructure,
+    CharAtBadPlace,
 };
 
 pub const KeyboardLayout = struct {

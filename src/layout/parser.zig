@@ -53,7 +53,7 @@ fn parseLayout(
     // Skip the first line return
     if (layout_iter.next()) |lc| {
         if (!std.mem.eql(u8, "\n", lc.bytes(layout))) {
-            return wrongStructureError(line, column, "\n", lc.bytes(layout), options);
+            return parseError(ParsingError.WrongStructure, line, column, "\n", lc.bytes(layout), options);
         }
     }
 
@@ -68,48 +68,56 @@ fn parseLayout(
                     if (std.mem.eql(u8, template_char, "\n")) {
                         line += 1;
                         column = 0; // Because autoincrement at the end of iteration
+                        continue;
                     }
                 } else {
-                    return wrongStructureError(line, column, template_char, layout_char, options);
+                    return parseError(ParsingError.WrongStructure, line, column, template_char, layout_char, options);
                 }
             }
 
-            // TODO: no char in offset or outside keys
-            // mod of line for keycode row
-            // * or space for first char
-            // something mandatory following * of dead key
-            // replace existing str if * present when reading second char, or error if space (on column or col - 1?)
+            // Char in layout
+            if (!std.mem.eql(u8, layout_char, " ")) {
+                // TODO: No char should be in the offset
+                if (column <= 0) { // TODO: offset
+                    return parseError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char, options);
+                }
 
-            if (!std.mem.eql(u8, template_char, layout_char)) {
+                // TODO: no char outside keys
+                // TODO: mod of line for keycode row
+                // TODO: * or space for first char
+                // TODO: something mandatory following * of dead key
+                // TODO: replace existing str if * present when reading second char, or error if space (on column or col - 1?)
+
                 // TODO: store chars but keep position in it
                 std.debug.print("layout_char: '{s}'\n", .{layout_char});
             }
         } else {
             // Template has characters but not the layout
-            return wrongStructureError(line, column, tc.bytes(template), "nothing", options);
+            return parseError(ParsingError.WrongStructure, line, column, tc.bytes(template), "nothing", options);
         }
     }
 
     // Skip the last line return
     if (layout_iter.next()) |lc| {
         if (!std.mem.eql(u8, "\n", lc.bytes(layout))) {
-            return wrongStructureError(line, column, "\n", lc.bytes(layout), options);
+            return parseError(ParsingError.WrongStructure, line, column, "\n", lc.bytes(layout), options);
         }
         line += 1;
         column = 1;
     } else {
-        return wrongStructureError(line, column, "\n", "nothing", options);
+        return parseError(ParsingError.WrongStructure, line, column, "\n", "nothing", options);
     }
 
     if (layout_iter.next()) |lc| {
         // Layout has characters but not the template
-        return wrongStructureError(line, column, "nothing", lc.bytes(layout), options);
+        return parseError(ParsingError.WrongStructure, line, column, "nothing", lc.bytes(layout), options);
     }
 
     return keymap;
 }
 
-fn wrongStructureError(
+fn parseError(
+    err: ParsingError,
     line: usize,
     column: usize,
     expected: []const u8,
@@ -122,7 +130,7 @@ fn wrongStructureError(
         diag.arg = replaceInvisibleCharInError(expected);
         diag.arg2 = replaceInvisibleCharInError(found);
     }
-    return ParsingError.WrongStructure;
+    return err;
 }
 
 fn replaceInvisibleCharInError(to_replace: []const u8) []const u8 {
@@ -596,4 +604,100 @@ test "parseLayout wrong indentation with tab" {
     try std.testing.expectEqual(1, diag.column);
     try std.testing.expectEqualStrings("┌", diag.arg);
     try std.testing.expectEqualStrings("a tabulation", diag.arg2);
+}
+
+test "parseLayout should not have char in offset" {
+    const layout =
+        \\
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
+        \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┳━━━━━━━┫
+        \\┃        ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
+        \\┃ ↹   a  ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┺┓  ⏎   ┃
+        \\┃         ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┃ ⇬       ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┣━━━━━━┳━━┹──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┷━━━━━┻━━━━━━┫
+        \\┃      ┃     │     │     │     │     │     │     │     │     │     │     ┃               ┃
+        \\┃ ⇧    ┃     │     │     │     │     │     │     │     │     │     │     ┃ ⇧             ┃
+        \\┣━━━━━━┻┳━━━━┷━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\
+    ;
+
+    var diag = Diagnostic{};
+    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+
+    try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
+    try std.testing.expectEqual(6, diag.line);
+    try std.testing.expectEqual(11, diag.column);
+    try std.testing.expectEqualStrings("nothing", diag.arg);
+    try std.testing.expectEqualStrings("a", diag.arg2);
+}
+
+test "parseLayout should not have char after keys" {
+    const layout =
+        \\
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
+        \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┳━━━━━━━┫
+        \\┃        ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
+        \\┃ ↹      ┃     │     │     │     │     │     │     │     │     │     │     │     ┃   a   ┃
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┺┓  ⏎   ┃
+        \\┃         ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┃ ⇬       ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┣━━━━━━┳━━┹──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┷━━━━━┻━━━━━━┫
+        \\┃      ┃     │     │     │     │     │     │     │     │     │     │     ┃               ┃
+        \\┃ ⇧    ┃     │     │     │     │     │     │     │     │     │     │     ┃ ⇧             ┃
+        \\┣━━━━━━┻┳━━━━┷━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\
+    ;
+
+    var diag = Diagnostic{};
+    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+
+    try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
+    try std.testing.expectEqual(6, diag.line);
+    try std.testing.expectEqual(116, diag.column);
+    try std.testing.expectEqualStrings("nothing", diag.arg);
+    try std.testing.expectEqualStrings("a", diag.arg2);
+}
+
+test "parseLayout should not have char in last line" {
+    const layout =
+        \\
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
+        \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┳━━━━━━━┫
+        \\┃        ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
+        \\┃ ↹      ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┺┓  ⏎   ┃
+        \\┃         ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┃ ⇬       ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┣━━━━━━┳━━┹──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┷━━━━━┻━━━━━━┫
+        \\┃      ┃     │     │     │     │     │     │     │     │     │     │     ┃               ┃
+        \\┃ ⇧    ┃     │     │     │     │     │     │     │     │     │     │     ┃ ⇧             ┃
+        \\┣━━━━━━┻┳━━━━┷━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣             a                ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\
+    ;
+
+    var diag = Diagnostic{};
+    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+
+    try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
+    try std.testing.expectEqual(15, diag.line);
+    try std.testing.expectEqual(51, diag.column);
+    try std.testing.expectEqualStrings("nothing", diag.arg);
+    try std.testing.expectEqualStrings("a", diag.arg2);
 }
