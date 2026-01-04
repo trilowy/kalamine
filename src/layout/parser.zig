@@ -75,7 +75,6 @@ fn parseLayout(
             }
 
             // TODO: no char in offset or outside keys
-            // maybe change all offset (-1)
             // mod of line for keycode row
             // * or space for first char
             // something mandatory following * of dead key

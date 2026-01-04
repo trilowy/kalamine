@@ -459,19 +459,19 @@ const iso_template =
 
 const iso_rows = [_]RowDescription{
     .{
-        .offset = 2,
+        .offset = 1,
         .keys = &[_]KeyCode{ .tlde, .ae01, .ae02, .ae03, .ae04, .ae05, .ae06, .ae07, .ae08, .ae09, .ae10, .ae11, .ae12 },
     },
     .{
-        .offset = 11,
+        .offset = 10,
         .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12 },
     },
     .{
-        .offset = 12,
+        .offset = 11,
         .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11, .bksl },
     },
     .{
-        .offset = 9,
+        .offset = 8,
         .keys = &[_]KeyCode{ .lsgt, .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10 },
     },
 };
@@ -497,19 +497,19 @@ const ansi_template =
 
 const ansi_rows = [_]RowDescription{
     .{
-        .offset = 2,
+        .offset = 1,
         .keys = &[_]KeyCode{ .tlde, .ae01, .ae02, .ae03, .ae04, .ae05, .ae06, .ae07, .ae08, .ae09, .ae10, .ae11, .ae12 },
     },
     .{
-        .offset = 11,
+        .offset = 10,
         .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12, .bksl },
     },
     .{
-        .offset = 12,
+        .offset = 11,
         .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11 },
     },
     .{
-        .offset = 15,
+        .offset = 14,
         .keys = &[_]KeyCode{ .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10 },
     },
 };
@@ -532,19 +532,19 @@ const ergo_template =
 
 const ergo_rows = [_]RowDescription{
     .{
-        .offset = 2,
+        .offset = 1,
         .keys = &[_]KeyCode{ .tlde, .ae01, .ae02, .ae03, .ae04, .ae05, .ae06, .ae07, .ae08, .ae09, .ae10, .ae11, .ae12 },
     },
     .{
-        .offset = 8,
+        .offset = 7,
         .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12 },
     },
     .{
-        .offset = 8,
+        .offset = 7,
         .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11, .bksl },
     },
     .{
-        .offset = 2,
+        .offset = 1,
         .keys = &[_]KeyCode{ .lsgt, .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10 },
     },
 };
@@ -570,19 +570,19 @@ const abnt_template =
 
 const abnt_rows = [_]RowDescription{
     .{
-        .offset = 2,
+        .offset = 1,
         .keys = &[_]KeyCode{ .tlde, .ae01, .ae02, .ae03, .ae04, .ae05, .ae06, .ae07, .ae08, .ae09, .ae10, .ae11, .ae12 },
     },
     .{
-        .offset = 11,
+        .offset = 10,
         .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12 },
     },
     .{
-        .offset = 12,
+        .offset = 11,
         .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11, .bksl },
     },
     .{
-        .offset = 9,
+        .offset = 8,
         .keys = &[_]KeyCode{ .lsgt, .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10, .ab11 },
     },
 };
@@ -608,19 +608,19 @@ const jis_template =
 
 const jis_rows = [_]RowDescription{
     .{
-        .offset = 8,
+        .offset = 7,
         .keys = &[_]KeyCode{ .ae01, .ae02, .ae03, .ae04, .ae05, .ae06, .ae07, .ae08, .ae09, .ae10, .ae11, .ae12, .ae13 },
     },
     .{
-        .offset = 11,
+        .offset = 10,
         .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12 },
     },
     .{
-        .offset = 12,
+        .offset = 11,
         .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11, .bksl },
     },
     .{
-        .offset = 15,
+        .offset = 14,
         .keys = &[_]KeyCode{ .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10, .ab11 },
     },
 };
@@ -646,19 +646,19 @@ const alt_template =
 
 const alt_rows = [_]RowDescription{
     .{
-        .offset = 2,
+        .offset = 1,
         .keys = &[_]KeyCode{ .tlde, .ae01, .ae02, .ae03, .ae04, .ae05, .ae06, .ae07, .ae08, .ae09, .ae10, .ae11, .ae12, .bksl },
     },
     .{
-        .offset = 11,
+        .offset = 10,
         .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12 },
     },
     .{
-        .offset = 12,
+        .offset = 11,
         .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11 },
     },
     .{
-        .offset = 15,
+        .offset = 14,
         .keys = &[_]KeyCode{ .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10 },
     },
 };
