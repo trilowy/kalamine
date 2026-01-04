@@ -1,5 +1,7 @@
 const std = @import("std");
 const toml = @import("toml");
+const layout_parser = @import("parser.zig");
+const ParsedKey = layout_parser.ParsedKey;
 const LetterCasing = @import("LetterCasing");
 const Graphemes = @import("Graphemes");
 
@@ -249,24 +251,40 @@ pub const KeyboardLayout = struct {
             .layers = layers,
         };
 
-        const rows = keyboard_layout.geometry.getKeys();
-
+        // TODO: line of the TOML is better for the feedback in diagnostic
         if (parsed_toml.full) |full_to_parse| {
             if (options.diagnostic) |diag| diag.arg = "full";
-            try keyboard_layout.parseTemplate(allocator, full_to_parse, &rows, Layer.base, options);
-            try keyboard_layout.parseTemplate(allocator, full_to_parse, &rows, Layer.altgr, options);
+
+            var keymap = try layout_parser.parseLayout(allocator, keyboard_layout.geometry, full_to_parse, options);
+            defer keymap.deinit(allocator);
+
+            // TODO: loop on multiple layers at the same time?
+            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.base, options);
+            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.altgr, options);
+
             keyboard_layout.has_altgr = true;
+
             if (options.diagnostic) |diag| diag.arg = "";
         } else if (parsed_toml.base) |base_to_parse| {
             if (options.diagnostic) |diag| diag.arg = "base";
-            try keyboard_layout.parseTemplate(allocator, base_to_parse, &rows, Layer.base, options);
-            try keyboard_layout.parseTemplate(allocator, base_to_parse, &rows, Layer.odk, options);
+
+            var keymap = try layout_parser.parseLayout(allocator, keyboard_layout.geometry, base_to_parse, options);
+            defer keymap.deinit(allocator);
+
+            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.base, options);
+            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.odk, options);
 
             if (parsed_toml.altgr) |altgr_to_parse| {
                 if (options.diagnostic) |diag| diag.arg = "altgr";
-                try keyboard_layout.parseTemplate(allocator, altgr_to_parse, &rows, Layer.altgr, options);
+
+                var altgr_keymap = try layout_parser.parseLayout(allocator, keyboard_layout.geometry, altgr_to_parse, options);
+                defer altgr_keymap.deinit(allocator);
+
+                try keyboard_layout.parseTemplate(allocator, &altgr_keymap, Layer.altgr, options);
+
                 keyboard_layout.has_altgr = true;
             }
+
             if (options.diagnostic) |diag| diag.arg = "";
         } else {
             return ParsingError.MissingLayout;
@@ -287,98 +305,62 @@ pub const KeyboardLayout = struct {
     fn parseTemplate(
         self: *KeyboardLayout,
         allocator: std.mem.Allocator,
-        template_lines: []const u8,
-        rows: []const RowDescription,
+        keymap: *const std.AutoHashMapUnmanaged(KeyCode, ParsedKey),
         layer: Layer,
         options: ParseOptions,
     ) !void {
-        var template = std.mem.splitScalar(u8, template_lines, '\n');
         const arena = self.arena_allocator.allocator();
 
         const case = try LetterCasing.init(allocator);
         defer case.deinit(allocator);
 
-        var j: usize = 0;
-        const col_offset: usize = if (layer == .base) 0 else 2;
+        var layer_map = self.layers.getPtr(layer).?;
+        var layer_map_shift = self.layers.getPtr(layer.shifted()).?;
 
-        for (rows) |row| {
-            defer j += 1;
+        var keymap_iter = keymap.iterator();
 
-            if (template.next() == null) {
-                if (options.diagnostic) |diag| diag.line = j;
-                return ParsingError.WrongValue;
-            }
+        while (keymap_iter.next()) |entry| {
+            const key_code = entry.key_ptr.*;
+            const parsed_key = entry.value_ptr.*;
 
-            var i = row.offset + col_offset;
+            if (layer == .base) {
+                if (parsed_key.left_up) |shift_key| {
+                    const key_to_put_shift = try arena.dupe(u8, shift_key);
+                    try layer_map_shift.put(arena, key_code, key_to_put_shift);
 
-            const shift = if (template.next()) |line| line else {
-                if (options.diagnostic) |diag| diag.line = j + 1;
-                return ParsingError.WrongValue;
-            };
-
-            const base = if (template.next()) |line| line else {
-                if (options.diagnostic) |diag| diag.line = j + 2;
-                return ParsingError.WrongValue;
-            };
-
-            for (row.keys) |key| {
-                // TODO: 6 by 6 grapheme clusters
-                // https://codeberg.org/atman/zg#grapheme-clusters
-                defer i += 6;
-
-                const base_key = if (base[i - 1] == '*')
-                    base[(i - 1)..(i + 1)]
-                else
-                    base[i..(i + 1)];
-
-                const shift_key = if (base[i - 1] == '*')
-                    shift[(i - 1)..(i + 1)]
-                else
-                    shift[i..(i + 1)];
-
-                // In the base layer, if the base character is undefined, shift prevails
-                if (layer == .base and
-                    std.mem.eql(u8, base_key, " ") and
-                    !std.mem.eql(u8, shift_key, " "))
-                {
-                    const base_key_to_put = try case.toLowerStr(arena, shift_key);
-                    var layer_map = self.layers.get(layer).?;
-                    try layer_map.put(arena, key, base_key_to_put);
-
-                    const shift_key_to_put = try arena.dupe(u8, shift_key);
-                    var shifted_layer_map = self.layers.get(layer.shifted()).?;
-                    try shifted_layer_map.put(arena, key, shift_key_to_put);
-                }
-                // In other layers, if the shift character is undefined, base prevails
-                else if ((layer == .altgr or layer == .odk) and
-                    std.mem.eql(u8, shift_key, " ") and
-                    !std.mem.eql(u8, base_key, " "))
-                {
-                    const base_key_to_put = try arena.dupe(u8, base_key);
-                    var layer_map = self.layers.get(layer).?;
-                    try layer_map.put(arena, key, base_key_to_put);
-
-                    const shift_key_to_put = try case.toUpperStr(arena, base_key);
-                    var shifted_layer_map = self.layers.get(layer.shifted()).?;
-                    try shifted_layer_map.put(arena, key, shift_key_to_put);
-                } else {
-                    if (!std.mem.eql(u8, base_key, " ")) {
-                        const base_key_to_put = try arena.dupe(u8, base_key);
-                        var layer_map = self.layers.get(layer).?;
-                        try layer_map.put(arena, key, base_key_to_put);
-                    }
-
-                    if (!std.mem.eql(u8, shift_key, " ")) {
-                        const shift_key_to_put = try arena.dupe(u8, shift_key);
-                        var shifted_layer_map = self.layers.get(layer).?;
-                        try shifted_layer_map.put(arena, key, shift_key_to_put);
+                    // In the base layer, if the base character is undefined, shift prevails
+                    if (parsed_key.left_down == null) {
+                        const key_to_put_base = try case.toLowerStr(arena, key_to_put_shift);
+                        try layer_map.put(arena, key_code, key_to_put_base);
                     }
                 }
 
-                // TODO: kalamine/layout.py:311
-                // dead_keys set
+                if (parsed_key.left_down) |base_key| {
+                    const key_to_put_base = try arena.dupe(u8, base_key);
+                    try layer_map.put(arena, key_code, key_to_put_base);
+                }
+            } else if (layer == .altgr or layer == .odk) {
+                if (parsed_key.right_down) |base_key| {
+                    const key_to_put_base = try arena.dupe(u8, base_key);
+                    try layer_map.put(arena, key_code, key_to_put_base);
+
+                    // In other layers, if the shift character is undefined, base prevails
+                    if (parsed_key.right_up == null) {
+                        const key_to_put_shift = try case.toUpperStr(arena, key_to_put_base);
+                        try layer_map_shift.put(arena, key_code, key_to_put_shift);
+                    }
+                }
+
+                if (parsed_key.right_up) |shift_key| {
+                    const key_to_put_shift = try arena.dupe(u8, shift_key);
+                    try layer_map_shift.put(arena, key_code, key_to_put_shift);
+                }
             }
         }
+
+        // TODO: kalamine/layout.py:311
+        // dead_keys set
+        _ = options;
     }
 
     // TODO: kalamine/layout.py:403

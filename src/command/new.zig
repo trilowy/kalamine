@@ -13,6 +13,7 @@ pub const Options = struct {
 
 /// Create a new TOML layout description
 pub fn run(allocator: std.mem.Allocator, options: Options) !void {
+    // TODO: at the end, check if the result is the same than the Python version
     // TODO: replace stdout by a file and put it nearer to were it is used
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
@@ -24,6 +25,9 @@ pub fn run(allocator: std.mem.Allocator, options: Options) !void {
     //     return diag.report(stdout, err);
     //     // TODO: no error for new layout but report error at higher level for build
     // };
+    // TODO: find the leak with the help of error report up here or tests
+
+    // TODO: check if 2 kinds of "é" can be compared
 
     // Make a KeyboardLayout, just to get the ASCII arts
     var keyboard_layout = try dummyLayout(allocator, &options);

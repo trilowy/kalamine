@@ -14,17 +14,10 @@ pub const ParsedKey = struct {
     right_down: ?[]const u8 = null,
 };
 
-// TODO: Loop once per TOML entry and return a structure of keys with 4 possible values
-// TODO: Then loop on this structure and copy what is needed (and apply shift rule) and deinit structure
-// TODO: if error, add layout name in diag.arg in caller function?
-// TODO: line of the TOML is better for the feedback
-// TODO: check if 2 kinds of "é" can be compared
-// TODO: do we check here that it is a valid dead key?
-
 /// Extract a keyboard layout
 /// Caller is responsible of freeing memory
 /// Inner character memory is bound to the layout parameter
-fn parseLayout(
+pub fn parseLayout(
     allocator: std.mem.Allocator,
     expected_geometry: Geometry,
     layout: []const u8,
@@ -249,6 +242,7 @@ fn putKeyOrDeadKey(
         if (is_char_in_layout) {
             // Dead key '*' to keep before layout char
             key.* = layout[(lc.offset - 1)..][0..(lc.len + 1)];
+            // TODO: do we check here that it is a valid dead key?
         } else {
             // Dead key followed by a space
             return parseError(
