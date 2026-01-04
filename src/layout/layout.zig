@@ -76,9 +76,10 @@ pub const ParseOptions = struct {
 
 pub const Diagnostic = struct {
     arg: []const u8 = "",
-    arg2: []const u8 = "",
     line: usize = 0,
     column: usize = 0,
+    expected: []const u8 = "",
+    found: []const u8 = "",
 
     pub fn report(self: Diagnostic, writer: *std.Io.Writer, err: anyerror) anyerror {
         switch (err) {
@@ -104,7 +105,7 @@ pub const Diagnostic = struct {
                     \\Expected: {s} found: {s}
                     \\See how the layout should be structured with the 'new' command
                     \\
-                , .{ self.arg, self.line, self.column, self.arg, self.arg2 });
+                , .{ self.arg, self.line, self.column, self.expected, self.found });
                 try writer.flush();
                 return error.ErrorReported;
             },
@@ -114,7 +115,7 @@ pub const Diagnostic = struct {
                     \\Expected: {s} found: {s}
                     \\See how the layout should be structured with the 'new' command
                     \\
-                , .{ self.arg, self.line, self.column, self.arg, self.arg2 });
+                , .{ self.arg, self.line, self.column, self.expected, self.found });
                 try writer.flush();
                 return error.ErrorReported;
             },
