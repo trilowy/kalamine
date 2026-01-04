@@ -14,7 +14,12 @@ pub const ParsedKey = struct {
     right_down: ?[]const u8 = null,
 };
 
+// TODO: Loop once per TOML entry and return a structure of keys with 4 possible values
+// TODO: Then loop on this structure and copy what is needed (and apply shift rule) and deinit structure
 // TODO: if error, add layout name in diag.arg in caller function?
+// TODO: line of the TOML is better for the feedback
+// TODO: check if 2 kinds of "é" can be compared
+// TODO: do we check here that it is a valid dead key?
 
 /// Extract a keyboard layout
 /// Caller is responsible of freeing memory
@@ -25,12 +30,6 @@ fn parseLayout(
     layout: []const u8,
     options: ParseOptions,
 ) !std.AutoHashMapUnmanaged(KeyCode, ParsedKey) {
-    // TODO: loop on empty template and filled template
-    // https://codeberg.org/atman/zg#grapheme-clusters
-    // Loop once per TOML entry and return a structure of keys with 4 possible values
-    // Loop on this structure and copy wath is needed (and shift rule) and deinit arena of structure
-    // TODO: check if 2 kinds of "é" can be compared
-    // TODO: rows mandatory to know the offset? avoid chars in layout in wrong key?
     const graph = try Graphemes.init(allocator);
     defer graph.deinit(allocator);
 
@@ -52,7 +51,6 @@ fn parseLayout(
     var template_iter = graph.iterator(template);
     var layout_iter = graph.iterator(layout);
 
-    // TODO: line of the TOML is better for the feedback
     var line: usize = 1;
     var column: usize = 1;
 
@@ -81,125 +79,185 @@ fn parseLayout(
                 continue;
             }
 
-            if (std.mem.eql(u8, layout_char, " ")) {
-                // No char in layout
-                // TODO: what to do if empty? check if dead key symbol before => error
-            } else {
-                // Char in layout
+            const is_char_in_layout = !std.mem.eql(u8, layout_char, " ");
 
-                const key_row = (line - 1) / nb_lines_per_key;
-                if (key_row >= keys.len) {
+            const key_row = (line - 1) / nb_lines_per_key;
+            if (key_row >= keys.len) {
+                if (is_char_in_layout) {
                     // No layout char outside key rows
                     return parseError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char, options);
+                } else {
+                    continue;
                 }
+            }
 
-                const offset = keys[key_row].offset;
-                if (column <= offset) {
+            const offset = keys[key_row].offset;
+            if (column <= offset) {
+                if (is_char_in_layout) {
                     // No layout char in the offset
                     return parseError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char, options);
+                } else {
+                    continue;
                 }
+            }
 
-                const key_column = (column - offset) / nb_columns_per_key;
-                if (key_column >= keys[key_row].keys.len) {
+            const key_column = (column - offset) / nb_columns_per_key;
+            if (key_column >= keys[key_row].keys.len) {
+                if (is_char_in_layout) {
                     // No layout char outside keys
                     return parseError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char, options);
+                } else {
+                    continue;
                 }
+            }
 
-                const in_key_column = @mod((column - offset), nb_columns_per_key);
-                if (in_key_column == 5) {
+            const in_key_column = @mod((column - offset), nb_columns_per_key);
+            if (in_key_column == 5) {
+                if (is_char_in_layout) {
                     // No layout char in the 5th column of a key
                     return parseError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char, options);
+                } else {
+                    continue;
                 }
+            }
 
-                if ((in_key_column == 1 or in_key_column == 3) and
-                    !std.mem.eql(u8, layout_char, "*"))
-                {
+            if ((in_key_column == 1 or in_key_column == 3) and
+                !std.mem.eql(u8, layout_char, "*"))
+            {
+                if (is_char_in_layout) {
                     // No other char than dead key in these columns
                     return parseError(ParsingError.CharAtBadPlace, line, column, "nothing or *", layout_char, options);
+                } else {
+                    continue;
                 }
+            }
 
-                const key_code = keys[key_row].keys[key_column];
-                var key = keymap.getPtr(key_code).?;
+            const key_code = keys[key_row].keys[key_column];
+            var key = keymap.getPtr(key_code).?;
 
-                const in_key_row = @mod((line - 1), nb_lines_per_key);
-                if (in_key_row == 1) {
-                    // Shifted char
-                    switch (in_key_column) {
-                        1 => {
+            const in_key_row = @mod((line - 1), nb_lines_per_key);
+            if (in_key_row == 1) {
+                // Shifted char
+                switch (in_key_column) {
+                    1 => {
+                        if (is_char_in_layout) {
                             // Dead key '*'
                             key.left_up = layout_char;
-                        },
-                        2 => {
-                            if (key.left_up) |_| {
+                        }
+                    },
+                    2 => {
+                        if (key.left_up) |_| {
+                            if (is_char_in_layout) {
                                 // Dead key '*' to keep before layout char
                                 key.left_up = getWholeDeadKey(layout, lc);
                             } else {
+                                // Dead key followed by a space
+                                return parseError(
+                                    ParsingError.CharAtBadPlace,
+                                    line,
+                                    column,
+                                    "second half of a dead key",
+                                    layout_char,
+                                    options,
+                                );
+                            }
+                        } else {
+                            if (is_char_in_layout) {
                                 key.left_up = layout_char;
                             }
-                        },
-                        3 => {
+                        }
+                    },
+                    3 => {
+                        if (is_char_in_layout) {
                             // Dead key '*'
                             key.right_up = layout_char;
-                        },
-                        4 => {
-                            if (key.right_up) |_| {
+                        }
+                    },
+                    4 => {
+                        if (key.right_up) |_| {
+                            if (is_char_in_layout) {
                                 // Dead key '*' to keep before layout char
                                 key.right_up = getWholeDeadKey(layout, lc);
                             } else {
+                                // Dead key followed by a space
+                                return parseError(
+                                    ParsingError.CharAtBadPlace,
+                                    line,
+                                    column,
+                                    "second half of a dead key",
+                                    layout_char,
+                                    options,
+                                );
+                            }
+                        } else {
+                            if (is_char_in_layout) {
                                 key.right_up = layout_char;
                             }
-                        },
-                        else => {},
-                    }
-                } else {
-                    // Non-shifted char
-                    switch (in_key_column) {
-                        1 => {
+                        }
+                    },
+                    else => {},
+                }
+            } else {
+                // Non-shifted char
+                switch (in_key_column) {
+                    1 => {
+                        if (is_char_in_layout) {
                             // Dead key '*'
                             key.left_down = layout_char;
-                        },
-                        2 => {
-                            if (key.left_down) |_| {
+                        }
+                    },
+                    2 => {
+                        if (key.left_down) |_| {
+                            if (is_char_in_layout) {
                                 // Dead key '*' to keep before layout char
                                 key.left_down = getWholeDeadKey(layout, lc);
                             } else {
+                                // Dead key followed by a space
+                                return parseError(
+                                    ParsingError.CharAtBadPlace,
+                                    line,
+                                    column,
+                                    "second half of a dead key",
+                                    layout_char,
+                                    options,
+                                );
+                            }
+                        } else {
+                            if (is_char_in_layout) {
                                 key.left_down = layout_char;
                             }
-                        },
-                        3 => {
+                        }
+                    },
+                    3 => {
+                        if (is_char_in_layout) {
                             // Dead key '*'
                             key.right_down = layout_char;
-                        },
-                        4 => {
-                            if (key.right_down) |_| {
+                        }
+                    },
+                    4 => {
+                        if (key.right_down) |_| {
+                            if (is_char_in_layout) {
                                 // Dead key '*' to keep before layout char
                                 key.right_down = getWholeDeadKey(layout, lc);
                             } else {
+                                // Dead key followed by a space
+                                return parseError(
+                                    ParsingError.CharAtBadPlace,
+                                    line,
+                                    column,
+                                    "second half of a dead key",
+                                    layout_char,
+                                    options,
+                                );
+                            }
+                        } else {
+                            if (is_char_in_layout) {
                                 key.right_down = layout_char;
                             }
-                        },
-                        else => {},
-                    }
+                        }
+                    },
+                    else => {},
                 }
-
-                // TODO: something mandatory following * of dead key
-                // TODO: do we check here that it is a valid dead key?
-                std.debug.print(
-                    \\layout_char:{s}
-                    \\line:{d}
-                    \\key_row:{d}
-                    \\column:{d}
-                    \\offset:{d}
-                    \\in_key_column:{d}
-                    \\
-                , .{
-                    layout_char,
-                    line,
-                    key_row,
-                    column,
-                    offset,
-                    in_key_column,
-                });
             }
         } else {
             // Template has characters but not the layout
@@ -911,4 +969,36 @@ test "parseLayout should not have char in 3rd column of a key" {
     try std.testing.expectEqual(43, diag.column);
     try std.testing.expectEqualStrings("nothing or *", diag.expected);
     try std.testing.expectEqualStrings("a", diag.found);
+}
+
+test "parseLayout empty dead key" {
+    const layout =
+        \\
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│*    │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
+        \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┳━━━━━━━┫
+        \\┃        ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
+        \\┃ ↹      ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┺┓  ⏎   ┃
+        \\┃         ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┃ ⇬       ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┣━━━━━━┳━━┹──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┷━━━━━┻━━━━━━┫
+        \\┃      ┃     │     │     │     │     │     │     │     │     │     │     ┃               ┃
+        \\┃ ⇧    ┃     │     │     │     │     │     │     │     │     │     │     ┃ ⇧             ┃
+        \\┣━━━━━━┻┳━━━━┷━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\
+    ;
+
+    var diag = Diagnostic{};
+    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+
+    try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
+    try std.testing.expectEqual(2, diag.line);
+    try std.testing.expectEqual(3, diag.column);
+    try std.testing.expectEqualStrings("second half of a dead key", diag.expected);
+    try std.testing.expectEqualStrings("a space", diag.found);
 }
