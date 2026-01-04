@@ -138,60 +138,32 @@ fn parseLayout(
             const in_key_row = @mod((line - 1), nb_lines_per_key);
             if (in_key_row == 1) {
                 // Shifted char
-
-                switch (in_key_column) {
-                    1 => putKey(&key.left_up, layout_char, is_char_in_layout),
-                    2 => try putKeyOrDeadKey(
-                        &key.left_up,
-                        layout_char,
-                        is_char_in_layout,
-                        layout,
-                        lc,
-                        line,
-                        column,
-                        options,
-                    ),
-                    3 => putKey(&key.right_up, layout_char, is_char_in_layout),
-                    4 => try putKeyOrDeadKey(
-                        &key.right_up,
-                        layout_char,
-                        is_char_in_layout,
-                        layout,
-                        lc,
-                        line,
-                        column,
-                        options,
-                    ),
-                    else => {},
-                }
+                try putKeyInKeymap(
+                    &key.left_up,
+                    &key.right_up,
+                    layout_char,
+                    is_char_in_layout,
+                    layout,
+                    lc,
+                    line,
+                    column,
+                    in_key_column,
+                    options,
+                );
             } else {
                 // Non-shifted char
-
-                switch (in_key_column) {
-                    1 => putKey(&key.left_down, layout_char, is_char_in_layout),
-                    2 => try putKeyOrDeadKey(
-                        &key.left_down,
-                        layout_char,
-                        is_char_in_layout,
-                        layout,
-                        lc,
-                        line,
-                        column,
-                        options,
-                    ),
-                    3 => putKey(&key.right_down, layout_char, is_char_in_layout),
-                    4 => try putKeyOrDeadKey(
-                        &key.right_down,
-                        layout_char,
-                        is_char_in_layout,
-                        layout,
-                        lc,
-                        line,
-                        column,
-                        options,
-                    ),
-                    else => {},
-                }
+                try putKeyInKeymap(
+                    &key.left_down,
+                    &key.right_down,
+                    layout_char,
+                    is_char_in_layout,
+                    layout,
+                    lc,
+                    line,
+                    column,
+                    in_key_column,
+                    options,
+                );
             }
         } else {
             // Template has characters but not the layout
@@ -216,6 +188,45 @@ fn parseLayout(
     }
 
     return keymap;
+}
+
+fn putKeyInKeymap(
+    key_left: *?[]const u8,
+    key_right: *?[]const u8,
+    layout_char: []const u8,
+    is_char_in_layout: bool,
+    layout: []const u8,
+    lc: Grapheme,
+    line: usize,
+    column: usize,
+    in_key_column: usize,
+    options: ParseOptions,
+) ParsingError!void {
+    switch (in_key_column) {
+        1 => putKey(key_left, layout_char, is_char_in_layout),
+        2 => try putKeyOrDeadKey(
+            key_left,
+            layout_char,
+            is_char_in_layout,
+            layout,
+            lc,
+            line,
+            column,
+            options,
+        ),
+        3 => putKey(key_right, layout_char, is_char_in_layout),
+        4 => try putKeyOrDeadKey(
+            key_right,
+            layout_char,
+            is_char_in_layout,
+            layout,
+            lc,
+            line,
+            column,
+            options,
+        ),
+        else => unreachable,
+    }
 }
 
 fn putKey(key: *?[]const u8, layout_char: []const u8, is_char_in_layout: bool) void {
