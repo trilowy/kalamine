@@ -31,6 +31,9 @@ fn parseLayout(
     const graph = try Graphemes.init(allocator);
     defer graph.deinit(allocator);
 
+    const nb_lines_per_key = 3;
+    const nb_columns_per_key = 6;
+
     const template = expected_geometry.getTemplate();
     const keys = expected_geometry.getKeys();
 
@@ -68,8 +71,8 @@ fn parseLayout(
                     if (std.mem.eql(u8, template_char, "\n")) {
                         line += 1;
                         column = 0; // Because autoincrement at the end of iteration
-                        continue;
                     }
+                    continue;
                 } else {
                     return parseError(ParsingError.WrongStructure, line, column, template_char, layout_char, options);
                 }
@@ -77,19 +80,37 @@ fn parseLayout(
 
             // Char in layout
             if (!std.mem.eql(u8, layout_char, " ")) {
-                // TODO: No char should be in the offset
-                if (column <= 0) { // TODO: offset
+                const key_row = line / nb_lines_per_key;
+                if (key_row < keys.len) {
+                    const offset = keys[key_row].offset;
+                    if (column <= offset) {
+                        // No layout char should be in the offset
+                        return parseError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char, options);
+                    }
+
+                    const key_column = (column - offset) / nb_columns_per_key;
+                    if (key_column >= keys[key_row].keys.len) {
+                        // No layout char outside keys
+                        return parseError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char, options);
+                    }
+
+                    const in_key_row = @mod(line, nb_lines_per_key);
+                    if (in_key_row == 2) {
+                        // TODO: Shifted char
+                    } else if (in_key_row == 0) {
+                        // TODO: Non-shifted char
+                    }
+
+                    // TODO: * or space for first char
+                    // TODO: something mandatory following * of dead key
+                    // TODO: replace existing str if * present when reading second char, or error if space (on column or col - 1?)
+
+                    // TODO: store chars but keep position in it
+                    std.debug.print("layout_char: '{s}'\n", .{layout_char});
+                } else {
+                    // Layout char outside key rows
                     return parseError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char, options);
                 }
-
-                // TODO: no char outside keys
-                // TODO: mod of line for keycode row
-                // TODO: * or space for first char
-                // TODO: something mandatory following * of dead key
-                // TODO: replace existing str if * present when reading second char, or error if space (on column or col - 1?)
-
-                // TODO: store chars but keep position in it
-                std.debug.print("layout_char: '{s}'\n", .{layout_char});
             }
         } else {
             // Template has characters but not the layout
@@ -633,7 +654,7 @@ test "parseLayout should not have char in offset" {
 
     try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
     try std.testing.expectEqual(6, diag.line);
-    try std.testing.expectEqual(11, diag.column);
+    try std.testing.expectEqual(7, diag.column);
     try std.testing.expectEqualStrings("nothing", diag.arg);
     try std.testing.expectEqualStrings("a", diag.arg2);
 }
@@ -665,7 +686,7 @@ test "parseLayout should not have char after keys" {
 
     try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
     try std.testing.expectEqual(6, diag.line);
-    try std.testing.expectEqual(116, diag.column);
+    try std.testing.expectEqual(86, diag.column);
     try std.testing.expectEqualStrings("nothing", diag.arg);
     try std.testing.expectEqualStrings("a", diag.arg2);
 }
@@ -697,7 +718,7 @@ test "parseLayout should not have char in last line" {
 
     try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
     try std.testing.expectEqual(15, diag.line);
-    try std.testing.expectEqual(51, diag.column);
+    try std.testing.expectEqual(41, diag.column);
     try std.testing.expectEqualStrings("nothing", diag.arg);
     try std.testing.expectEqualStrings("a", diag.arg2);
 }
