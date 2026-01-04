@@ -1,5 +1,4 @@
 const std = @import("std");
-const ArgParser = @import("cli/ArgParser.zig");
 const cli = @import("cli/cli.zig");
 const cli_help = @import("cli/cli_help.zig");
 const build = @import("command/build.zig");
