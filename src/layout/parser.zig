@@ -138,124 +138,58 @@ fn parseLayout(
             const in_key_row = @mod((line - 1), nb_lines_per_key);
             if (in_key_row == 1) {
                 // Shifted char
+
                 switch (in_key_column) {
-                    1 => {
-                        if (is_char_in_layout) {
-                            // Dead key '*'
-                            key.left_up = layout_char;
-                        }
-                    },
-                    2 => {
-                        if (key.left_up) |_| {
-                            if (is_char_in_layout) {
-                                // Dead key '*' to keep before layout char
-                                key.left_up = getWholeDeadKey(layout, lc);
-                            } else {
-                                // Dead key followed by a space
-                                return parseError(
-                                    ParsingError.CharAtBadPlace,
-                                    line,
-                                    column,
-                                    "second half of a dead key",
-                                    layout_char,
-                                    options,
-                                );
-                            }
-                        } else {
-                            if (is_char_in_layout) {
-                                key.left_up = layout_char;
-                            }
-                        }
-                    },
-                    3 => {
-                        if (is_char_in_layout) {
-                            // Dead key '*'
-                            key.right_up = layout_char;
-                        }
-                    },
-                    4 => {
-                        if (key.right_up) |_| {
-                            if (is_char_in_layout) {
-                                // Dead key '*' to keep before layout char
-                                key.right_up = getWholeDeadKey(layout, lc);
-                            } else {
-                                // Dead key followed by a space
-                                return parseError(
-                                    ParsingError.CharAtBadPlace,
-                                    line,
-                                    column,
-                                    "second half of a dead key",
-                                    layout_char,
-                                    options,
-                                );
-                            }
-                        } else {
-                            if (is_char_in_layout) {
-                                key.right_up = layout_char;
-                            }
-                        }
-                    },
+                    1 => putKey(&key.left_up, layout_char, is_char_in_layout),
+                    2 => try putKeyOrDeadKey(
+                        &key.left_up,
+                        layout_char,
+                        is_char_in_layout,
+                        layout,
+                        lc,
+                        line,
+                        column,
+                        options,
+                    ),
+                    3 => putKey(&key.right_up, layout_char, is_char_in_layout),
+                    4 => try putKeyOrDeadKey(
+                        &key.right_up,
+                        layout_char,
+                        is_char_in_layout,
+                        layout,
+                        lc,
+                        line,
+                        column,
+                        options,
+                    ),
                     else => {},
                 }
             } else {
                 // Non-shifted char
+
                 switch (in_key_column) {
-                    1 => {
-                        if (is_char_in_layout) {
-                            // Dead key '*'
-                            key.left_down = layout_char;
-                        }
-                    },
-                    2 => {
-                        if (key.left_down) |_| {
-                            if (is_char_in_layout) {
-                                // Dead key '*' to keep before layout char
-                                key.left_down = getWholeDeadKey(layout, lc);
-                            } else {
-                                // Dead key followed by a space
-                                return parseError(
-                                    ParsingError.CharAtBadPlace,
-                                    line,
-                                    column,
-                                    "second half of a dead key",
-                                    layout_char,
-                                    options,
-                                );
-                            }
-                        } else {
-                            if (is_char_in_layout) {
-                                key.left_down = layout_char;
-                            }
-                        }
-                    },
-                    3 => {
-                        if (is_char_in_layout) {
-                            // Dead key '*'
-                            key.right_down = layout_char;
-                        }
-                    },
-                    4 => {
-                        if (key.right_down) |_| {
-                            if (is_char_in_layout) {
-                                // Dead key '*' to keep before layout char
-                                key.right_down = getWholeDeadKey(layout, lc);
-                            } else {
-                                // Dead key followed by a space
-                                return parseError(
-                                    ParsingError.CharAtBadPlace,
-                                    line,
-                                    column,
-                                    "second half of a dead key",
-                                    layout_char,
-                                    options,
-                                );
-                            }
-                        } else {
-                            if (is_char_in_layout) {
-                                key.right_down = layout_char;
-                            }
-                        }
-                    },
+                    1 => putKey(&key.left_down, layout_char, is_char_in_layout),
+                    2 => try putKeyOrDeadKey(
+                        &key.left_down,
+                        layout_char,
+                        is_char_in_layout,
+                        layout,
+                        lc,
+                        line,
+                        column,
+                        options,
+                    ),
+                    3 => putKey(&key.right_down, layout_char, is_char_in_layout),
+                    4 => try putKeyOrDeadKey(
+                        &key.right_down,
+                        layout_char,
+                        is_char_in_layout,
+                        layout,
+                        lc,
+                        line,
+                        column,
+                        options,
+                    ),
                     else => {},
                 }
             }
@@ -284,9 +218,40 @@ fn parseLayout(
     return keymap;
 }
 
-fn getWholeDeadKey(layout: []const u8, lc: Grapheme) []const u8 {
-    // Dead key '*' to keep before layout char
-    return layout[(lc.offset - 1)..][0..(lc.len + 1)];
+fn putKey(key: *?[]const u8, layout_char: []const u8, is_char_in_layout: bool) void {
+    if (is_char_in_layout) {
+        key.* = layout_char;
+    }
+}
+
+fn putKeyOrDeadKey(
+    key: *?[]const u8,
+    layout_char: []const u8,
+    is_char_in_layout: bool,
+    layout: []const u8,
+    lc: Grapheme,
+    line: usize,
+    column: usize,
+    options: ParseOptions,
+) ParsingError!void {
+    if (key.*) |_| {
+        if (is_char_in_layout) {
+            // Dead key '*' to keep before layout char
+            key.* = layout[(lc.offset - 1)..][0..(lc.len + 1)];
+        } else {
+            // Dead key followed by a space
+            return parseError(
+                ParsingError.CharAtBadPlace,
+                line,
+                column,
+                "second half of a dead key",
+                layout_char,
+                options,
+            );
+        }
+    } else {
+        putKey(key, layout_char, is_char_in_layout);
+    }
 }
 
 fn parseError(
