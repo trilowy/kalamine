@@ -15,6 +15,7 @@ pub const Options = struct {
 pub fn run(allocator: std.mem.Allocator, options: Options) !void {
     // TODO: at the end, check if the result is the same than the Python version
     // TODO: replace stdout by a file and put it nearer to were it is used
+    // https://pedropark99.github.io/zig-book/Chapters/12-file-op.html
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
