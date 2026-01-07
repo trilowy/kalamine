@@ -3,6 +3,9 @@ const layout = @import("../layout/layout.zig");
 const Geometry = layout.Geometry;
 const KeyboardLayout = layout.KeyboardLayout;
 const toml_generator = @import("../generator/toml.zig");
+const error_handling = @import("../error_handling.zig");
+const Diagnostic = error_handling.Diagnostic;
+const ParseOptions = error_handling.ParseOptions;
 
 pub const Options = struct {
     output_file: []const u8,
@@ -12,7 +15,7 @@ pub const Options = struct {
 };
 
 /// Create a new TOML layout description
-pub fn run(allocator: std.mem.Allocator, options: Options) !void {
+pub fn run(allocator: std.mem.Allocator, options: Options, parse_options: ParseOptions) !void {
     // TODO: at the end, check if the result is the same than the Python version
     // TODO: replace stdout by a file and put it nearer to were it is used
     // https://pedropark99.github.io/zig-book/Chapters/12-file-op.html
@@ -27,11 +30,16 @@ pub fn run(allocator: std.mem.Allocator, options: Options) !void {
     //     // TODO: no error for new layout but report error at higher level for build
     // };
     // TODO: find the leak with the help of error report up here or tests
+    // TODO: at the end of coding this function "new", see if there is useless imports
 
     // TODO: check if 2 kinds of "é" can be compared
 
     // Make a KeyboardLayout, just to get the ASCII arts
-    var keyboard_layout = try dummyLayout(allocator, &options);
+    var keyboard_layout = try dummyLayout(allocator, &options, parse_options);
+    // var keyboard_layout = dummyLayout(allocator, &options, parse_options) catch |err| {
+    //     return diag.report(stdout, err);
+    //     // TODO: no error for new layout but report error at higher level for build
+    // };
     defer keyboard_layout.deinit();
     std.debug.print("parse\n{any}\n", .{keyboard_layout});
 
@@ -63,7 +71,11 @@ pub fn run(allocator: std.mem.Allocator, options: Options) !void {
 }
 
 /// Create a dummy (QWERTY) layout with the given characteristics
-fn dummyLayout(allocator: std.mem.Allocator, options: *const Options) !KeyboardLayout {
+fn dummyLayout(
+    allocator: std.mem.Allocator,
+    options: *const Options,
+    parse_options: ParseOptions,
+) !KeyboardLayout {
     var file_content = std.ArrayList(u8).empty;
     defer file_content.deinit(allocator);
 
@@ -78,7 +90,7 @@ fn dummyLayout(allocator: std.mem.Allocator, options: *const Options) !KeyboardL
     }
 
     var reader = std.Io.Reader.fixed(file_content.items);
-    return try KeyboardLayout.initFromToml(allocator, &reader, .{});
+    return KeyboardLayout.initFromToml(allocator, &reader, parse_options);
 }
 
 const dummy_metadata =
@@ -163,3 +175,4 @@ const dummy_altgr_layout =
     \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
     \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
 ;
+// FIXME: Alt should not be named AltGr

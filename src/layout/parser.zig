@@ -1,8 +1,9 @@
 const std = @import("std");
 const Geometry = @import("layout.zig").Geometry;
-const ParseOptions = @import("layout.zig").ParseOptions;
-const ParsingError = @import("layout.zig").ParsingError;
-const Diagnostic = @import("layout.zig").Diagnostic;
+const error_handling = @import("../error_handling.zig");
+const ParseOptions = error_handling.ParseOptions;
+const Diagnostic = error_handling.Diagnostic;
+const ParsingError = @import("layout.zig").ParsingError; // TODO: ParsingError stay in layout but add error method in Diagnostic
 const KeyCode = @import("layout.zig").KeyCode;
 const Graphemes = @import("Graphemes");
 const Grapheme = Graphemes.Grapheme;

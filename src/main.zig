@@ -5,6 +5,7 @@ const build = @import("command/build.zig");
 const new = @import("command/new.zig");
 const watch = @import("command/watch.zig");
 const version = @import("command/version.zig");
+const Diagnostic = @import("error_handling.zig").Diagnostic;
 
 pub fn main() u8 {
     var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
@@ -64,9 +65,12 @@ fn execute(
         },
         .new => |options| {
             // TODO: to implement
-            try stdout.writeAll("new command not yet implemented\n");
-            try stdout.flush();
-            try new.run(allocator, options); // TODO: handle error
+            var diag = Diagnostic{};
+
+            try new.run(allocator, options, .{ .diagnostic = &diag }) catch |err| {
+                return diag.report(stdout, err);
+                // TODO: no error for new layout but report error at higher level for build
+            }; // TODO: handle error
         },
         .watch => |options| {
             // TODO: to implement
