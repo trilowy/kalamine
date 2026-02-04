@@ -1,3 +1,4 @@
+use crate::layout::KeyboardGeometry;
 use clap::ValueEnum;
 
 #[derive(Debug, Clone, ValueEnum, Default)]
@@ -10,18 +11,6 @@ pub enum OutputType {
     XkbKeymap,
     XkbSymbols,
     Svg,
-}
-
-#[derive(Debug, Clone, ValueEnum, Default)]
-#[clap(rename_all = "UPPERCASE")]
-pub enum KeyboardGeometry {
-    #[default]
-    Iso,
-    Ansi,
-    Ergo,
-    Abnt,
-    Jis,
-    Alt,
 }
 
 pub struct KeyboardLayout {

@@ -1,19 +1,15 @@
-use crate::{
-    command::{build, guide, new, watch},
-    model::{KeyboardGeometry, OutputType},
-};
+use crate::{layout::KeyboardGeometry, model::OutputType};
 use clap::{Parser, Subcommand};
 
-/// Kalamine, a keyboard layout maker
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct ProgramArguments {
     #[clap(subcommand)]
-    action: Command,
+    pub action: Command,
 }
 
 #[derive(Subcommand, Debug)]
-enum Command {
+pub enum Command {
     /// Convert TOML/YAML description into OS-specific keyboard drivers
     Build {
         /// TOML/YAML description path
@@ -28,7 +24,7 @@ enum Command {
         #[clap(short, long)]
         angle_mod: bool,
 
-        /// Keep shortcuts at their qwerty location
+        /// Keep shortcuts at their QWERTY location
         #[clap(short, long)]
         qwerty_shortcuts: bool,
     },
@@ -64,39 +60,4 @@ enum Command {
 
     /// Show user guide
     Guide,
-}
-
-impl ProgramArguments {
-    pub fn run_command(self) {
-        match self.action {
-            Command::Build {
-                layout_descriptor,
-                out,
-                angle_mod,
-                qwerty_shortcuts,
-            } => {
-                build(layout_descriptor, out, angle_mod, qwerty_shortcuts);
-            }
-
-            Command::New {
-                output_file,
-                geometry,
-                altgr,
-                odk,
-            } => {
-                new(output_file, geometry, altgr, odk);
-            }
-
-            Command::Watch {
-                file_path,
-                angle_mod,
-            } => {
-                watch(file_path, angle_mod);
-            }
-
-            Command::Guide => {
-                guide();
-            }
-        }
-    }
 }

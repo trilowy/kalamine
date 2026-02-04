@@ -2,10 +2,11 @@
 name = "kalamine"
 version = "0.38.0"
 edition = "2024"
-description = "A cross-platform Keyboard Layout Maker"
+rust-version = "1.88"
+description = "Kalamine, a keyboard layout maker"
 authors = ["Fabien Cazenave <fabien@cazenave.cc>"]
 license = "MIT"
 repository = "https://github.com/OneDeadKey/kalamine"
 
 [dependencies]
-clap = { version = "4.5.39", features = ["derive"] }
+clap = { version = "4.5.57", features = ["derive"] }
