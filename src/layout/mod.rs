@@ -2,7 +2,7 @@ use clap::ValueEnum;
 
 #[derive(Debug, Clone, ValueEnum, Default)]
 #[clap(rename_all = "UPPERCASE")]
-pub enum KeyboardGeometry {
+pub enum Geometry {
     #[default]
     Iso,
     Ansi,
@@ -12,7 +12,7 @@ pub enum KeyboardGeometry {
     Alt,
 }
 
-impl KeyboardGeometry {
+impl Geometry {
     fn get_template(self) -> &'static str {
         match self {
             Self::Iso => ISO_TEMPLATE,
@@ -23,6 +23,121 @@ impl KeyboardGeometry {
             Self::Alt => ALT_TEMPLATE,
         }
     }
+}
+
+pub enum Layer {
+    Base,
+    Shift,
+    Odk,
+    OdkShift,
+    Altgr,
+    AltgrShift,
+}
+
+impl Layer {
+    fn shifted(self) -> Layer {
+        return match self {
+            Self::Base => Self::Shift,
+            Self::Shift => Self::Shift,
+            Self::Odk => Self::OdkShift,
+            Self::OdkShift => Self::OdkShift,
+            Self::Altgr => Self::AltgrShift,
+            Self::AltgrShift => Self::AltgrShift,
+        };
+    }
+}
+
+pub struct KeyboardLayout {
+    // TODO:
+    /// Full layout name, displayed in the keyboard settings
+    name: String,
+    /// Short Windows filename: no spaces, no special chars
+    name8: String, // TODO: validation
+    /// Locale/language ID
+    locale: String, // TODO: validation
+    /// Layout variant ID
+    variant: String,
+    /// Author name
+    author: String,
+    description: String,
+    url: String, // TODO: validation
+    version: String,
+    geometry: Geometry,
+
+    file_name: String,
+    license: String,
+
+    base_layer: Layer,
+    shif_base_layer: Option<Layer>,
+    altgr_layer: Option<Layer>,
+    shift_altgr_layer: Option<Layer>,
+    odk_layer: Option<Layer>,
+    shift_odk_layer: Option<Layer>,
+}
+
+// TODO: kalamine/layout.py:276
+// parse template the same as python version? how to make it more robust?
+// better parsing error message?
+// parse first the template to see if it matches perfectly first?
+// tips of why it might not match: spaces at the beginning of the line
+// row and column where it does not match
+
+pub struct RowDescription {
+    offset: usize,
+    keys: Vec<KeyCode>,
+}
+
+pub enum KeyCode {
+    Ab01,
+    Ab02,
+    Ab03,
+    Ab04,
+    Ab05,
+    Ab06,
+    Ab07,
+    Ab08,
+    Ab09,
+    Ab10,
+    Ab11,
+    Ac01,
+    Ac02,
+    Ac03,
+    Ac04,
+    Ac05,
+    Ac06,
+    Ac07,
+    Ac08,
+    Ac09,
+    Ac10,
+    Ac11,
+    Ad01,
+    Ad02,
+    Ad03,
+    Ad04,
+    Ad05,
+    Ad06,
+    Ad07,
+    Ad08,
+    Ad09,
+    Ad10,
+    Ad11,
+    Ad12,
+    Ae01,
+    Ae02,
+    Ae03,
+    Ae04,
+    Ae05,
+    Ae06,
+    Ae07,
+    Ae08,
+    Ae09,
+    Ae10,
+    Ae11,
+    Ae12,
+    Ae13,
+    Bksl,
+    Lsgt,
+    Tlde,
 }
 
 const ISO_TEMPLATE: &str = r#"
@@ -43,6 +158,25 @@ const ISO_TEMPLATE: &str = r#"
 ┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
 ┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
 "#;
+
+const ISO_ROWS: &[RowDescription] = &[
+    RowDescription{
+        offset = 1,
+        keys = vec![ KeyCode::Tlde, KeyCode::Ae01, KeyCode::Ae02, KeyCode::Ae03, KeyCode::Ae04, KeyCode::Ae05, KeyCode::Ae06, KeyCode::Ae07, KeyCode::Ae08, KeyCode::Ae09, KeyCode::Ae10, KeyCode::Ae11, KeyCode::Ae12 ],
+    },
+    // .{
+    //     .offset = 10,
+    //     .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12 },
+    // },
+    // .{
+    //     .offset = 11,
+    //     .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11, .bksl },
+    // },
+    // .{
+    //     .offset = 8,
+    //     .keys = &[_]KeyCode{ .lsgt, .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10 },
+    // },
+];
 
 const ANSI_TEMPLATE: &str = r#"
 ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓

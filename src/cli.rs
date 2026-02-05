@@ -1,5 +1,5 @@
-use crate::{layout::KeyboardGeometry, model::OutputType};
-use clap::{Parser, Subcommand};
+use crate::layout::Geometry;
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -37,7 +37,7 @@ pub enum Command {
         /// Specify keyboard geometry
         #[clap(short, long, default_value_t)]
         #[arg(value_enum)]
-        geometry: KeyboardGeometry,
+        geometry: Geometry,
 
         /// Set an AltGr layer
         #[clap(short, long)]
@@ -60,4 +60,16 @@ pub enum Command {
 
     /// Show user guide
     Guide,
+}
+
+#[derive(Debug, Clone, ValueEnum, Default)]
+#[clap(rename_all = "snake_case")]
+pub enum OutputType {
+    #[default]
+    All,
+    Keylayout,
+    Klc,
+    XkbKeymap,
+    XkbSymbols,
+    Svg,
 }

@@ -8,7 +8,6 @@ mod cli;
 mod command;
 mod layout;
 mod lexer;
-mod model;
 
 fn main() {
     let command = ProgramArguments::parse();
