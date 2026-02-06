@@ -1,3 +1,5 @@
+//! Parse with clap lib all args and generate a help with doc comments
+
 use crate::layout::Geometry;
 use clap::{Parser, Subcommand, ValueEnum};
 

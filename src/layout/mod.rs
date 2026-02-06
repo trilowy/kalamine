@@ -1,3 +1,5 @@
+//! Layout definition
+
 use clap::ValueEnum;
 use std::collections::HashMap;
 
@@ -14,6 +16,7 @@ pub enum Geometry {
 }
 
 impl Geometry {
+    /// Get the keyboard geometry drawn in ASCII art
     fn get_template(self) -> &'static str {
         match self {
             Self::Iso => ISO_TEMPLATE,
@@ -25,6 +28,8 @@ impl Geometry {
         }
     }
 
+    /// Get the list of keyboard keys, organized in rows with the offset of characters in the ASCII
+    /// art drawing
     fn get_keys(self) -> [RowDescription<'static>; 4] {
         match self {
             Self::Iso => ISO_ROWS,
@@ -96,7 +101,9 @@ pub struct KeyboardLayout {
 // row and column where it does not match
 
 pub struct RowDescription<'a> {
+    /// Offset of characters in the ASCII art drawing
     offset: usize,
+    /// List of keys in this keyboard row
     keys: &'a [KeyCode],
 }
 
