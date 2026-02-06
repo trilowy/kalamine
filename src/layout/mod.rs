@@ -82,9 +82,9 @@ pub struct KeyboardLayout {
 // tips of why it might not match: spaces at the beginning of the line
 // row and column where it does not match
 
-pub struct RowDescription {
+pub struct RowDescription<'a> {
     offset: usize,
-    keys: Vec<KeyCode>,
+    keys: &'a [KeyCode],
 }
 
 pub enum KeyCode {
@@ -160,22 +160,74 @@ const ISO_TEMPLATE: &str = r#"
 "#;
 
 const ISO_ROWS: &[RowDescription] = &[
-    RowDescription{
-        offset = 1,
-        keys = vec![ KeyCode::Tlde, KeyCode::Ae01, KeyCode::Ae02, KeyCode::Ae03, KeyCode::Ae04, KeyCode::Ae05, KeyCode::Ae06, KeyCode::Ae07, KeyCode::Ae08, KeyCode::Ae09, KeyCode::Ae10, KeyCode::Ae11, KeyCode::Ae12 ],
+    RowDescription {
+        offset: 1,
+        keys: &[
+            KeyCode::Tlde,
+            KeyCode::Ae01,
+            KeyCode::Ae02,
+            KeyCode::Ae03,
+            KeyCode::Ae04,
+            KeyCode::Ae05,
+            KeyCode::Ae06,
+            KeyCode::Ae07,
+            KeyCode::Ae08,
+            KeyCode::Ae09,
+            KeyCode::Ae10,
+            KeyCode::Ae11,
+            KeyCode::Ae12,
+        ],
     },
-    // .{
-    //     .offset = 10,
-    //     .keys = &[_]KeyCode{ .ad01, .ad02, .ad03, .ad04, .ad05, .ad06, .ad07, .ad08, .ad09, .ad10, .ad11, .ad12 },
-    // },
-    // .{
-    //     .offset = 11,
-    //     .keys = &[_]KeyCode{ .ac01, .ac02, .ac03, .ac04, .ac05, .ac06, .ac07, .ac08, .ac09, .ac10, .ac11, .bksl },
-    // },
-    // .{
-    //     .offset = 8,
-    //     .keys = &[_]KeyCode{ .lsgt, .ab01, .ab02, .ab03, .ab04, .ab05, .ab06, .ab07, .ab08, .ab09, .ab10 },
-    // },
+    RowDescription {
+        offset: 10,
+        keys: &[
+            KeyCode::Ad01,
+            KeyCode::Ad02,
+            KeyCode::Ad03,
+            KeyCode::Ad04,
+            KeyCode::Ad05,
+            KeyCode::Ad06,
+            KeyCode::Ad07,
+            KeyCode::Ad08,
+            KeyCode::Ad09,
+            KeyCode::Ad10,
+            KeyCode::Ad11,
+            KeyCode::Ad12,
+        ],
+    },
+    RowDescription {
+        offset: 11,
+        keys: &[
+            KeyCode::Ac01,
+            KeyCode::Ac02,
+            KeyCode::Ac03,
+            KeyCode::Ac04,
+            KeyCode::Ac05,
+            KeyCode::Ac06,
+            KeyCode::Ac07,
+            KeyCode::Ac08,
+            KeyCode::Ac09,
+            KeyCode::Ac10,
+            KeyCode::Ac11,
+            KeyCode::Bksl,
+        ],
+    },
+    RowDescription {
+        offset: 8,
+        keys: &[
+            KeyCode::Lsgt,
+            KeyCode::Ab01,
+            KeyCode::Ab02,
+            KeyCode::Ab03,
+            KeyCode::Ab04,
+            KeyCode::Ab05,
+            KeyCode::Ab06,
+            KeyCode::Ab07,
+            KeyCode::Ab08,
+            KeyCode::Ab09,
+            KeyCode::Ab10,
+        ],
+    },
 ];
 
 const ANSI_TEMPLATE: &str = r#"
@@ -197,6 +249,76 @@ const ANSI_TEMPLATE: &str = r#"
 ┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
 "#;
 
+const ANSI_ROWS: &[RowDescription] = &[
+    RowDescription {
+        offset: 1,
+        keys: &[
+            KeyCode::Tlde,
+            KeyCode::Ae01,
+            KeyCode::Ae02,
+            KeyCode::Ae03,
+            KeyCode::Ae04,
+            KeyCode::Ae05,
+            KeyCode::Ae06,
+            KeyCode::Ae07,
+            KeyCode::Ae08,
+            KeyCode::Ae09,
+            KeyCode::Ae10,
+            KeyCode::Ae11,
+            KeyCode::Ae12,
+        ],
+    },
+    RowDescription {
+        offset: 10,
+        keys: &[
+            KeyCode::Ad01,
+            KeyCode::Ad02,
+            KeyCode::Ad03,
+            KeyCode::Ad04,
+            KeyCode::Ad05,
+            KeyCode::Ad06,
+            KeyCode::Ad07,
+            KeyCode::Ad08,
+            KeyCode::Ad09,
+            KeyCode::Ad10,
+            KeyCode::Ad11,
+            KeyCode::Ad12,
+            KeyCode::Bksl,
+        ],
+    },
+    RowDescription {
+        offset: 11,
+        keys: &[
+            KeyCode::Ac01,
+            KeyCode::Ac02,
+            KeyCode::Ac03,
+            KeyCode::Ac04,
+            KeyCode::Ac05,
+            KeyCode::Ac06,
+            KeyCode::Ac07,
+            KeyCode::Ac08,
+            KeyCode::Ac09,
+            KeyCode::Ac10,
+            KeyCode::Ac11,
+        ],
+    },
+    RowDescription {
+        offset: 14,
+        keys: &[
+            KeyCode::Ab01,
+            KeyCode::Ab02,
+            KeyCode::Ab03,
+            KeyCode::Ab04,
+            KeyCode::Ab05,
+            KeyCode::Ab06,
+            KeyCode::Ab07,
+            KeyCode::Ab08,
+            KeyCode::Ab09,
+            KeyCode::Ab10,
+        ],
+    },
+];
+
 const ERGO_TEMPLATE: &str = r#"
 ╭╌╌╌╌╌┰─────┬─────┬─────┬─────┬─────┰─────┬─────┬─────┬─────┬─────┰╌╌╌╌╌┬╌╌╌╌╌╮
 ┆     ┃     │     │     │     │     ┃     │     │     │     │     ┃     ┆     ┆
@@ -212,6 +334,77 @@ const ERGO_TEMPLATE: &str = r#"
 ┆     ┃     │     │     │     │     ┃     │     │     │     │     ┃
 ╰╌╌╌╌╌┸─────┴─────┴─────┴─────┴─────┸─────┴─────┴─────┴─────┴─────┚
 "#;
+
+const ERGO_ROWS: &[RowDescription] = &[
+    RowDescription {
+        offset: 1,
+        keys: &[
+            KeyCode::Tlde,
+            KeyCode::Ae01,
+            KeyCode::Ae02,
+            KeyCode::Ae03,
+            KeyCode::Ae04,
+            KeyCode::Ae05,
+            KeyCode::Ae06,
+            KeyCode::Ae07,
+            KeyCode::Ae08,
+            KeyCode::Ae09,
+            KeyCode::Ae10,
+            KeyCode::Ae11,
+            KeyCode::Ae12,
+        ],
+    },
+    RowDescription {
+        offset: 7,
+        keys: &[
+            KeyCode::Ad01,
+            KeyCode::Ad02,
+            KeyCode::Ad03,
+            KeyCode::Ad04,
+            KeyCode::Ad05,
+            KeyCode::Ad06,
+            KeyCode::Ad07,
+            KeyCode::Ad08,
+            KeyCode::Ad09,
+            KeyCode::Ad10,
+            KeyCode::Ad11,
+            KeyCode::Ad12,
+        ],
+    },
+    RowDescription {
+        offset: 7,
+        keys: &[
+            KeyCode::Ac01,
+            KeyCode::Ac02,
+            KeyCode::Ac03,
+            KeyCode::Ac04,
+            KeyCode::Ac05,
+            KeyCode::Ac06,
+            KeyCode::Ac07,
+            KeyCode::Ac08,
+            KeyCode::Ac09,
+            KeyCode::Ac10,
+            KeyCode::Ac11,
+            KeyCode::Bksl,
+        ],
+    },
+    RowDescription {
+        offset: 1,
+        keys: &[
+            KeyCode::Lsgt,
+            KeyCode::Ab01,
+            KeyCode::Ab02,
+            KeyCode::Ab03,
+            KeyCode::Ab04,
+            KeyCode::Ab05,
+            KeyCode::Ab06,
+            KeyCode::Ab07,
+            KeyCode::Ab08,
+            KeyCode::Ab09,
+            KeyCode::Ab10,
+        ],
+    },
+];
 
 const ABNT_TEMPLATE: &str = r#"
 ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
@@ -232,6 +425,78 @@ const ABNT_TEMPLATE: &str = r#"
 ┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
 "#;
 
+const ABNT_ROWS: &[RowDescription] = &[
+    RowDescription {
+        offset: 1,
+        keys: &[
+            KeyCode::Tlde,
+            KeyCode::Ae01,
+            KeyCode::Ae02,
+            KeyCode::Ae03,
+            KeyCode::Ae04,
+            KeyCode::Ae05,
+            KeyCode::Ae06,
+            KeyCode::Ae07,
+            KeyCode::Ae08,
+            KeyCode::Ae09,
+            KeyCode::Ae10,
+            KeyCode::Ae11,
+            KeyCode::Ae12,
+        ],
+    },
+    RowDescription {
+        offset: 10,
+        keys: &[
+            KeyCode::Ad01,
+            KeyCode::Ad02,
+            KeyCode::Ad03,
+            KeyCode::Ad04,
+            KeyCode::Ad05,
+            KeyCode::Ad06,
+            KeyCode::Ad07,
+            KeyCode::Ad08,
+            KeyCode::Ad09,
+            KeyCode::Ad10,
+            KeyCode::Ad11,
+            KeyCode::Ad12,
+        ],
+    },
+    RowDescription {
+        offset: 11,
+        keys: &[
+            KeyCode::Ac01,
+            KeyCode::Ac02,
+            KeyCode::Ac03,
+            KeyCode::Ac04,
+            KeyCode::Ac05,
+            KeyCode::Ac06,
+            KeyCode::Ac07,
+            KeyCode::Ac08,
+            KeyCode::Ac09,
+            KeyCode::Ac10,
+            KeyCode::Ac11,
+            KeyCode::Bksl,
+        ],
+    },
+    RowDescription {
+        offset: 8,
+        keys: &[
+            KeyCode::Lsgt,
+            KeyCode::Ab01,
+            KeyCode::Ab02,
+            KeyCode::Ab03,
+            KeyCode::Ab04,
+            KeyCode::Ab05,
+            KeyCode::Ab06,
+            KeyCode::Ab07,
+            KeyCode::Ab08,
+            KeyCode::Ab09,
+            KeyCode::Ab10,
+            KeyCode::Ab11,
+        ],
+    },
+];
+
 const JIS_TEMPLATE: &str = r#"
 ┏━━━━━┱─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━┓
 ┃     ┃     │     │     │     │     │     │     │     │     │     │     │     │     ┃     ┃
@@ -251,6 +516,77 @@ const JIS_TEMPLATE: &str = r#"
 ┗━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━┹──────────────┺━━━━━┻━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━━┛
 "#;
 
+const JIS_ROWS: &[RowDescription] = &[
+    RowDescription {
+        offset: 7,
+        keys: &[
+            KeyCode::Ae01,
+            KeyCode::Ae02,
+            KeyCode::Ae03,
+            KeyCode::Ae04,
+            KeyCode::Ae05,
+            KeyCode::Ae06,
+            KeyCode::Ae07,
+            KeyCode::Ae08,
+            KeyCode::Ae09,
+            KeyCode::Ae10,
+            KeyCode::Ae11,
+            KeyCode::Ae12,
+            KeyCode::Ae13,
+        ],
+    },
+    RowDescription {
+        offset: 10,
+        keys: &[
+            KeyCode::Ad01,
+            KeyCode::Ad02,
+            KeyCode::Ad03,
+            KeyCode::Ad04,
+            KeyCode::Ad05,
+            KeyCode::Ad06,
+            KeyCode::Ad07,
+            KeyCode::Ad08,
+            KeyCode::Ad09,
+            KeyCode::Ad10,
+            KeyCode::Ad11,
+            KeyCode::Ad12,
+        ],
+    },
+    RowDescription {
+        offset: 11,
+        keys: &[
+            KeyCode::Ac01,
+            KeyCode::Ac02,
+            KeyCode::Ac03,
+            KeyCode::Ac04,
+            KeyCode::Ac05,
+            KeyCode::Ac06,
+            KeyCode::Ac07,
+            KeyCode::Ac08,
+            KeyCode::Ac09,
+            KeyCode::Ac10,
+            KeyCode::Ac11,
+            KeyCode::Bksl,
+        ],
+    },
+    RowDescription {
+        offset: 14,
+        keys: &[
+            KeyCode::Ab01,
+            KeyCode::Ab02,
+            KeyCode::Ab03,
+            KeyCode::Ab04,
+            KeyCode::Ab05,
+            KeyCode::Ab06,
+            KeyCode::Ab07,
+            KeyCode::Ab08,
+            KeyCode::Ab09,
+            KeyCode::Ab10,
+            KeyCode::Ab11,
+        ],
+    },
+];
+
 const ALT_TEMPLATE: &str = r#"
 ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━┓
 │     │     │     │     │     │     │     │     │     │     │     │     │     │     ┃     ┃
@@ -269,3 +605,73 @@ const ALT_TEMPLATE: &str = r#"
 ┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl   ┃
 ┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━━┛
 "#;
+
+const ALT_ROWS: &[RowDescription] = &[
+    RowDescription {
+        offset: 1,
+        keys: &[
+            KeyCode::Tlde,
+            KeyCode::Ae01,
+            KeyCode::Ae02,
+            KeyCode::Ae03,
+            KeyCode::Ae04,
+            KeyCode::Ae05,
+            KeyCode::Ae06,
+            KeyCode::Ae07,
+            KeyCode::Ae08,
+            KeyCode::Ae09,
+            KeyCode::Ae10,
+            KeyCode::Ae11,
+            KeyCode::Ae12,
+            KeyCode::Bksl,
+        ],
+    },
+    RowDescription {
+        offset: 10,
+        keys: &[
+            KeyCode::Ad01,
+            KeyCode::Ad02,
+            KeyCode::Ad03,
+            KeyCode::Ad04,
+            KeyCode::Ad05,
+            KeyCode::Ad06,
+            KeyCode::Ad07,
+            KeyCode::Ad08,
+            KeyCode::Ad09,
+            KeyCode::Ad10,
+            KeyCode::Ad11,
+            KeyCode::Ad12,
+        ],
+    },
+    RowDescription {
+        offset: 11,
+        keys: &[
+            KeyCode::Ac01,
+            KeyCode::Ac02,
+            KeyCode::Ac03,
+            KeyCode::Ac04,
+            KeyCode::Ac05,
+            KeyCode::Ac06,
+            KeyCode::Ac07,
+            KeyCode::Ac08,
+            KeyCode::Ac09,
+            KeyCode::Ac10,
+            KeyCode::Ac11,
+        ],
+    },
+    RowDescription {
+        offset: 14,
+        keys: &[
+            KeyCode::Ab01,
+            KeyCode::Ab02,
+            KeyCode::Ab03,
+            KeyCode::Ab04,
+            KeyCode::Ab05,
+            KeyCode::Ab06,
+            KeyCode::Ab07,
+            KeyCode::Ab08,
+            KeyCode::Ab09,
+            KeyCode::Ab10,
+        ],
+    },
+];
