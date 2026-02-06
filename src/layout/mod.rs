@@ -1,4 +1,5 @@
 use clap::ValueEnum;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, ValueEnum, Default)]
 #[clap(rename_all = "UPPERCASE")]
@@ -21,6 +22,17 @@ impl Geometry {
             Self::Abnt => ABNT_TEMPLATE,
             Self::Jis => JIS_TEMPLATE,
             Self::Alt => ALT_TEMPLATE,
+        }
+    }
+
+    fn get_keys(self) -> [RowDescription<'static>; 4] {
+        match self {
+            Self::Iso => ISO_ROWS,
+            Self::Ansi => ANSI_ROWS,
+            Self::Ergo => ERGO_ROWS,
+            Self::Abnt => ABNT_ROWS,
+            Self::Jis => JIS_ROWS,
+            Self::Alt => ALT_ROWS,
         }
     }
 }
@@ -54,21 +66,22 @@ pub struct KeyboardLayout {
     /// Short Windows filename: no spaces, no special chars
     name8: String, // TODO: validation
     /// Locale/language ID
-    locale: String, // TODO: validation
+    locale: Option<String>, // TODO: validation
     /// Layout variant ID
-    variant: String,
+    variant: Option<String>,
     /// Author name
-    author: String,
-    description: String,
-    url: String, // TODO: validation
-    version: String,
+    author: Option<String>,
+    description: Option<String>,
+    url: Option<String>, // TODO: validation
+    version: Option<String>,
     geometry: Geometry,
+    layers: HashMap<Layer, HashMap<KeyCode, String>>,
+    has_altgr: bool,
+    has_1dk: bool,
 
-    file_name: String,
-    license: String,
-
+    // FIXME: see if better than hashmap
     base_layer: Layer,
-    shif_base_layer: Option<Layer>,
+    shift_base_layer: Option<Layer>,
     altgr_layer: Option<Layer>,
     shift_altgr_layer: Option<Layer>,
     odk_layer: Option<Layer>,
@@ -159,7 +172,7 @@ const ISO_TEMPLATE: &str = r#"
 ┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
 "#;
 
-const ISO_ROWS: &[RowDescription] = &[
+const ISO_ROWS: [RowDescription; 4] = [
     RowDescription {
         offset: 1,
         keys: &[
@@ -249,7 +262,7 @@ const ANSI_TEMPLATE: &str = r#"
 ┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
 "#;
 
-const ANSI_ROWS: &[RowDescription] = &[
+const ANSI_ROWS: [RowDescription; 4] = [
     RowDescription {
         offset: 1,
         keys: &[
@@ -335,7 +348,7 @@ const ERGO_TEMPLATE: &str = r#"
 ╰╌╌╌╌╌┸─────┴─────┴─────┴─────┴─────┸─────┴─────┴─────┴─────┴─────┚
 "#;
 
-const ERGO_ROWS: &[RowDescription] = &[
+const ERGO_ROWS: [RowDescription; 4] = [
     RowDescription {
         offset: 1,
         keys: &[
@@ -425,7 +438,7 @@ const ABNT_TEMPLATE: &str = r#"
 ┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
 "#;
 
-const ABNT_ROWS: &[RowDescription] = &[
+const ABNT_ROWS: [RowDescription; 4] = [
     RowDescription {
         offset: 1,
         keys: &[
@@ -516,7 +529,7 @@ const JIS_TEMPLATE: &str = r#"
 ┗━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━┹──────────────┺━━━━━┻━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━━┛
 "#;
 
-const JIS_ROWS: &[RowDescription] = &[
+const JIS_ROWS: [RowDescription; 4] = [
     RowDescription {
         offset: 7,
         keys: &[
@@ -606,7 +619,7 @@ const ALT_TEMPLATE: &str = r#"
 ┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━━┛
 "#;
 
-const ALT_ROWS: &[RowDescription] = &[
+const ALT_ROWS: [RowDescription; 4] = [
     RowDescription {
         offset: 1,
         keys: &[
