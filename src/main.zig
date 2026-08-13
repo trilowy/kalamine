@@ -65,9 +65,10 @@ fn execute(
         },
         .new => |options| {
             // TODO: to implement
-            var diag = Diagnostic{};
+            var diag = Diagnostic{ .allocator = allocator };
+            defer diag.deinit();
 
-            try new.run(allocator, options, .{ .diagnostic = &diag }) catch |err| {
+            new.run(allocator, options, .{ .diagnostic = &diag }) catch |err| {
                 return diag.report(stdout, err);
                 // TODO: no error for new layout but report error at higher level for build
             }; // TODO: handle error

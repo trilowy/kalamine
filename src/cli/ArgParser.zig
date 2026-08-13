@@ -90,14 +90,7 @@ test flag {
     try std.testing.expect(!parser.flag(&.{"command"}));
 }
 
-fn expectEqualOptionalString(m_expect: ?[]const u8, m_actual: ?[]const u8) !void {
-    if (m_expect) |expect| {
-        try std.testing.expect(m_actual != null);
-        try std.testing.expectEqualStrings(expect, m_actual.?);
-    } else {
-        try std.testing.expect(m_actual == null);
-    }
-}
+const expectEqualOptionalString = @import("../test/util.zig").expectEqualOptionalString;
 
 test option {
     var parser = ArgParser{ .args = &.{

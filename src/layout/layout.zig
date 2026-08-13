@@ -4,6 +4,9 @@ const layout_parser = @import("parser.zig");
 const ParsedKey = layout_parser.ParsedKey;
 const LetterCasing = @import("LetterCasing");
 const Graphemes = @import("Graphemes");
+const error_handling = @import("../error_handling.zig");
+const ParseOptions = error_handling.ParseOptions;
+const ParsingError = error_handling.ParsingError;
 
 pub const Geometry = enum {
     ISO,

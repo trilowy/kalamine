@@ -3,7 +3,7 @@ const Geometry = @import("layout.zig").Geometry;
 const error_handling = @import("../error_handling.zig");
 const ParseOptions = error_handling.ParseOptions;
 const Diagnostic = error_handling.Diagnostic;
-const ParsingError = @import("layout.zig").ParsingError; // TODO: ParsingError stay in layout but add error method in Diagnostic
+const ParsingError = error_handling.ParsingError;
 const KeyCode = @import("layout.zig").KeyCode;
 const Graphemes = @import("Graphemes");
 const Grapheme = Graphemes.Grapheme;
@@ -51,7 +51,7 @@ pub fn parseLayout(
     // Skip the first line return
     if (layout_iter.next()) |lc| {
         if (!std.mem.eql(u8, "\n", lc.bytes(layout))) {
-            return parseError(ParsingError.WrongStructure, line, column, "\n", lc.bytes(layout), options);
+            return options.setParsingError(ParsingError.WrongStructure, line, column, "\n", lc.bytes(layout));
         }
     }
 
@@ -63,7 +63,7 @@ pub fn parseLayout(
             // Empty template and parsed template should have same structure
             if (!std.mem.eql(u8, template_char, " ")) {
                 if (!std.mem.eql(u8, template_char, layout_char)) {
-                    return parseError(ParsingError.WrongStructure, line, column, template_char, layout_char, options);
+                    return options.setParsingError(ParsingError.WrongStructure, line, column, template_char, layout_char);
                 }
 
                 if (std.mem.eql(u8, template_char, "\n")) {
@@ -79,7 +79,7 @@ pub fn parseLayout(
             if (key_row >= keys.len) {
                 if (is_char_in_layout) {
                     // No layout char outside key rows
-                    return parseError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char, options);
+                    return options.setParsingError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char);
                 } else {
                     continue;
                 }
@@ -89,7 +89,7 @@ pub fn parseLayout(
             if (column <= offset) {
                 if (is_char_in_layout) {
                     // No layout char in the offset
-                    return parseError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char, options);
+                    return options.setParsingError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char);
                 } else {
                     continue;
                 }
@@ -99,7 +99,7 @@ pub fn parseLayout(
             if (key_column >= keys[key_row].keys.len) {
                 if (is_char_in_layout) {
                     // No layout char outside keys
-                    return parseError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char, options);
+                    return options.setParsingError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char);
                 } else {
                     continue;
                 }
@@ -109,7 +109,7 @@ pub fn parseLayout(
             if (in_key_column == 5) {
                 if (is_char_in_layout) {
                     // No layout char in the 5th column of a key
-                    return parseError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char, options);
+                    return options.setParsingError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char);
                 } else {
                     continue;
                 }
@@ -120,7 +120,7 @@ pub fn parseLayout(
             {
                 if (is_char_in_layout) {
                     // No other char than dead key in these columns
-                    return parseError(ParsingError.CharAtBadPlace, line, column, "nothing or *", layout_char, options);
+                    return options.setParsingError(ParsingError.CharAtBadPlace, line, column, "nothing or *", layout_char);
                 } else {
                     continue;
                 }
@@ -161,24 +161,24 @@ pub fn parseLayout(
             }
         } else {
             // Template has characters but not the layout
-            return parseError(ParsingError.WrongStructure, line, column, tc.bytes(template), "nothing", options);
+            return options.setParsingError(ParsingError.WrongStructure, line, column, tc.bytes(template), "nothing");
         }
     }
 
     // Skip the last line return
     if (layout_iter.next()) |lc| {
         if (!std.mem.eql(u8, "\n", lc.bytes(layout))) {
-            return parseError(ParsingError.WrongStructure, line, column, "\n", lc.bytes(layout), options);
+            return options.setParsingError(ParsingError.WrongStructure, line, column, "\n", lc.bytes(layout));
         }
         line += 1;
         column = 1;
     } else {
-        return parseError(ParsingError.WrongStructure, line, column, "\n", "nothing", options);
+        return options.setParsingError(ParsingError.WrongStructure, line, column, "\n", "nothing");
     }
 
     if (layout_iter.next()) |lc| {
         // Layout has characters but not the template
-        return parseError(ParsingError.WrongStructure, line, column, "nothing", lc.bytes(layout), options);
+        return options.setParsingError(ParsingError.WrongStructure, line, column, "nothing", lc.bytes(layout));
     }
 
     return keymap;
@@ -246,48 +246,17 @@ fn putKeyOrDeadKey(
             // TODO: do we check here that it is a valid dead key?
         } else {
             // Dead key followed by a space
-            return parseError(
+            return options.setParsingError(
                 ParsingError.CharAtBadPlace,
                 line,
                 column,
                 "second half of a dead key",
                 layout_char,
-                options,
             );
         }
     } else {
         putKey(key, layout_char, is_char_in_layout);
     }
-}
-
-fn parseError(
-    err: ParsingError,
-    line: usize,
-    column: usize,
-    expected: []const u8,
-    found: []const u8,
-    options: ParseOptions,
-) ParsingError {
-    if (options.diagnostic) |diag| {
-        diag.line = line;
-        diag.column = column;
-        diag.expected = replaceInvisibleCharInError(expected);
-        diag.found = replaceInvisibleCharInError(found);
-    }
-    return err;
-}
-
-fn replaceInvisibleCharInError(to_replace: []const u8) []const u8 {
-    if (std.mem.eql(u8, to_replace, "\n")) {
-        return "a line return";
-    }
-    if (std.mem.eql(u8, to_replace, "\t")) {
-        return "a tabulation";
-    }
-    if (std.mem.eql(u8, to_replace, " ")) {
-        return "a space";
-    }
-    return to_replace;
 }
 
 test "parseLayout full layout" {
@@ -545,6 +514,8 @@ test "parseLayout empty layout" {
     try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab10));
 }
 
+const expectEqualOptionalString = @import("../test/util.zig").expectEqualOptionalString;
+
 test "parseLayout no first line return" {
     const layout =
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
@@ -566,14 +537,16 @@ test "parseLayout no first line return" {
         \\
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
     try std.testing.expectEqual(1, diag.line);
     try std.testing.expectEqual(1, diag.column);
-    try std.testing.expectEqualStrings("a line return", diag.expected);
-    try std.testing.expectEqualStrings("┌", diag.found);
+    try expectEqualOptionalString("a line return", diag.expected);
+    try expectEqualOptionalString("┌", diag.found);
 }
 
 test "parseLayout no last line return" {
@@ -597,14 +570,16 @@ test "parseLayout no last line return" {
         \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
     try std.testing.expectEqual(16, diag.line);
     try std.testing.expectEqual(91, diag.column);
-    try std.testing.expectEqualStrings("a line return", diag.expected);
-    try std.testing.expectEqualStrings("nothing", diag.found);
+    try expectEqualOptionalString("a line return", diag.expected);
+    try expectEqualOptionalString("nothing", diag.found);
 }
 
 test "parseLayout truncated layout" {
@@ -614,14 +589,16 @@ test "parseLayout truncated layout" {
         \\
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
     try std.testing.expectEqual(2, diag.line);
     try std.testing.expectEqual(1, diag.column);
-    try std.testing.expectEqualStrings("│", diag.expected);
-    try std.testing.expectEqualStrings("nothing", diag.found);
+    try expectEqualOptionalString("│", diag.expected);
+    try expectEqualOptionalString("nothing", diag.found);
 }
 
 test "parseLayout truncated layout line return" {
@@ -630,14 +607,16 @@ test "parseLayout truncated layout line return" {
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
     try std.testing.expectEqual(1, diag.line);
     try std.testing.expectEqual(91, diag.column);
-    try std.testing.expectEqualStrings("a line return", diag.expected);
-    try std.testing.expectEqualStrings("nothing", diag.found);
+    try expectEqualOptionalString("a line return", diag.expected);
+    try expectEqualOptionalString("nothing", diag.found);
 }
 
 test "parseLayout too many char" {
@@ -662,14 +641,16 @@ test "parseLayout too many char" {
         \\a
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
     try std.testing.expectEqual(17, diag.line);
     try std.testing.expectEqual(1, diag.column);
-    try std.testing.expectEqualStrings("nothing", diag.expected);
-    try std.testing.expectEqualStrings("a", diag.found);
+    try expectEqualOptionalString("nothing", diag.expected);
+    try expectEqualOptionalString("a", diag.found);
 }
 
 test "parseLayout too many line returns" {
@@ -695,14 +676,16 @@ test "parseLayout too many line returns" {
         \\
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
     try std.testing.expectEqual(17, diag.line);
     try std.testing.expectEqual(1, diag.column);
-    try std.testing.expectEqualStrings("nothing", diag.expected);
-    try std.testing.expectEqualStrings("a line return", diag.found);
+    try expectEqualOptionalString("nothing", diag.expected);
+    try expectEqualOptionalString("a line return", diag.found);
 }
 
 test "parseLayout wrong indentation with spaces" {
@@ -727,27 +710,31 @@ test "parseLayout wrong indentation with spaces" {
         \\
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
     try std.testing.expectEqual(1, diag.line);
     try std.testing.expectEqual(1, diag.column);
-    try std.testing.expectEqualStrings("┌", diag.expected);
-    try std.testing.expectEqualStrings("a space", diag.found);
+    try expectEqualOptionalString("┌", diag.expected);
+    try expectEqualOptionalString("a space", diag.found);
 }
 
 test "parseLayout wrong indentation with tab" {
     const layout = "\n\t┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓";
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
     try std.testing.expectEqual(1, diag.line);
     try std.testing.expectEqual(1, diag.column);
-    try std.testing.expectEqualStrings("┌", diag.expected);
-    try std.testing.expectEqualStrings("a tabulation", diag.found);
+    try expectEqualOptionalString("┌", diag.expected);
+    try expectEqualOptionalString("a tabulation", diag.found);
 }
 
 test "parseLayout should not have char in offset" {
@@ -772,14 +759,16 @@ test "parseLayout should not have char in offset" {
         \\
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
     try std.testing.expectEqual(6, diag.line);
     try std.testing.expectEqual(7, diag.column);
-    try std.testing.expectEqualStrings("nothing", diag.expected);
-    try std.testing.expectEqualStrings("a", diag.found);
+    try expectEqualOptionalString("nothing", diag.expected);
+    try expectEqualOptionalString("a", diag.found);
 }
 
 test "parseLayout should not have char after keys" {
@@ -804,14 +793,16 @@ test "parseLayout should not have char after keys" {
         \\
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
     try std.testing.expectEqual(6, diag.line);
     try std.testing.expectEqual(86, diag.column);
-    try std.testing.expectEqualStrings("nothing", diag.expected);
-    try std.testing.expectEqualStrings("a", diag.found);
+    try expectEqualOptionalString("nothing", diag.expected);
+    try expectEqualOptionalString("a", diag.found);
 }
 
 test "parseLayout should not have char in last line" {
@@ -836,14 +827,16 @@ test "parseLayout should not have char in last line" {
         \\
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
     try std.testing.expectEqual(15, diag.line);
     try std.testing.expectEqual(41, diag.column);
-    try std.testing.expectEqualStrings("nothing", diag.expected);
-    try std.testing.expectEqualStrings("a", diag.found);
+    try expectEqualOptionalString("nothing", diag.expected);
+    try expectEqualOptionalString("a", diag.found);
 }
 
 test "parseLayout should not have char in last column of a key" {
@@ -868,14 +861,16 @@ test "parseLayout should not have char in last column of a key" {
         \\
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
     try std.testing.expectEqual(3, diag.line);
     try std.testing.expectEqual(42, diag.column);
-    try std.testing.expectEqualStrings("nothing", diag.expected);
-    try std.testing.expectEqualStrings("a", diag.found);
+    try expectEqualOptionalString("nothing", diag.expected);
+    try expectEqualOptionalString("a", diag.found);
 }
 
 test "parseLayout should not have char in 1st column of a key" {
@@ -900,14 +895,16 @@ test "parseLayout should not have char in 1st column of a key" {
         \\
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
     try std.testing.expectEqual(5, diag.line);
     try std.testing.expectEqual(41, diag.column);
-    try std.testing.expectEqualStrings("nothing or *", diag.expected);
-    try std.testing.expectEqualStrings("a", diag.found);
+    try expectEqualOptionalString("nothing or *", diag.expected);
+    try expectEqualOptionalString("a", diag.found);
 }
 
 test "parseLayout should not have char in 3rd column of a key" {
@@ -932,14 +929,16 @@ test "parseLayout should not have char in 3rd column of a key" {
         \\
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
     try std.testing.expectEqual(5, diag.line);
     try std.testing.expectEqual(43, diag.column);
-    try std.testing.expectEqualStrings("nothing or *", diag.expected);
-    try std.testing.expectEqualStrings("a", diag.found);
+    try expectEqualOptionalString("nothing or *", diag.expected);
+    try expectEqualOptionalString("a", diag.found);
 }
 
 test "parseLayout empty dead key" {
@@ -964,12 +963,14 @@ test "parseLayout empty dead key" {
         \\
     ;
 
-    var diag = Diagnostic{};
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
     const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
     try std.testing.expectEqual(2, diag.line);
     try std.testing.expectEqual(3, diag.column);
-    try std.testing.expectEqualStrings("second half of a dead key", diag.expected);
-    try std.testing.expectEqualStrings("a space", diag.found);
+    try expectEqualOptionalString("second half of a dead key", diag.expected);
+    try expectEqualOptionalString("a space", diag.found);
 }

@@ -2,16 +2,53 @@ const std = @import("std");
 
 pub const ParseOptions = struct {
     diagnostic: ?*Diagnostic = null,
+
+    pub fn setParsingError(
+        self: ParseOptions,
+        err: ParsingError,
+        line: usize,
+        column: usize,
+        expected: []const u8,
+        found: []const u8,
+    ) ParsingError {
+        if (self.diagnostic) |diag| {
+            diag.setParsingError(line, column, expected, found);
+        }
+        return err;
+    }
 };
 
 pub const Diagnostic = struct {
-    // FIXME: error cannot be reported in higher call if expected/found is on the stack
-    // maybe keep the whole message in memory? deinit when reported
+    allocator: std.mem.Allocator,
     arg: []const u8 = "",
     line: usize = 0,
     column: usize = 0,
-    expected: []const u8 = "",
-    found: []const u8 = "",
+    expected: ?[]const u8 = null,
+    found: ?[]const u8 = null,
+
+    pub fn deinit(self: *Diagnostic) void {
+        if (self.expected) |expected| {
+            self.allocator.free(expected);
+        }
+        if (self.found) |found| {
+            self.allocator.free(found);
+        }
+    }
+
+    pub fn setParsingError(
+        self: *Diagnostic,
+        line: usize,
+        column: usize,
+        expected: []const u8,
+        found: []const u8,
+    ) void {
+        // TODO: change line number according to the field in error in TOML (might have to write a TOML lib for that)
+        self.line = line;
+        self.column = column;
+        // Allocator to make the error strings go up in the stack (avoid dangling pointer)
+        self.expected = self.allocator.dupe(u8, replaceInvisibleCharInError(expected)) catch @panic("Out of memory");
+        self.found = self.allocator.dupe(u8, replaceInvisibleCharInError(found)) catch @panic("Out of memory");
+    }
 
     pub fn report(self: Diagnostic, writer: *std.Io.Writer, err: anyerror) anyerror {
         switch (err) {
@@ -37,7 +74,7 @@ pub const Diagnostic = struct {
                     \\Expected: {s} found: {s}
                     \\See how the layout should be structured with the 'new' command
                     \\
-                , .{ self.arg, self.line, self.column, self.expected, self.found });
+                , .{ self.arg, self.line, self.column, self.expected orelse "", self.found orelse "" });
                 try writer.flush();
                 return error.ErrorReported;
             },
@@ -47,12 +84,25 @@ pub const Diagnostic = struct {
                     \\Expected: {s} found: {s}
                     \\See how the layout should be structured with the 'new' command
                     \\
-                , .{ self.arg, self.line, self.column, self.expected, self.found });
+                , .{ self.arg, self.line, self.column, self.expected orelse "", self.found orelse "" });
                 try writer.flush();
                 return error.ErrorReported;
             },
             else => return err,
         }
+    }
+
+    fn replaceInvisibleCharInError(to_replace: []const u8) []const u8 {
+        if (std.mem.eql(u8, to_replace, "\n")) {
+            return "a line return";
+        }
+        if (std.mem.eql(u8, to_replace, "\t")) {
+            return "a tabulation";
+        }
+        if (std.mem.eql(u8, to_replace, " ")) {
+            return "a space";
+        }
+        return to_replace;
     }
 };
 
