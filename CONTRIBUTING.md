@@ -8,7 +8,6 @@ Zig setup
 ### Requirements
 
 - [Zig] 0.15.2
-  - Tip: you can manage Zig versions with [zvm]
 
 
 ### Run
@@ -36,7 +35,6 @@ Zig setup
 
 
 [Zig]: https://ziglang.org
-[zvm]: https://github.com/tristanisham/zvm
 
 
 
