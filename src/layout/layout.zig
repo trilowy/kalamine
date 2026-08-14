@@ -8,6 +8,13 @@ const error_handling = @import("../error_handling.zig");
 const ParseOptions = error_handling.ParseOptions;
 const ParsingError = error_handling.ParsingError;
 
+const default_spacebar_base = " ";
+const default_spacebar_shift = " ";
+const default_spacebar_altgr = " ";
+const default_spacebar_altgr_shift = " ";
+const default_spacebar_odk = "'";
+const default_spacebar_odk_shift = "'";
+
 pub const Geometry = enum {
     ISO,
     ANSI,
@@ -58,7 +65,6 @@ pub const Layer = enum {
         };
     }
 };
-// TODO: if needed: @intFromEnum(Layer.base)
 
 const TomlContent = struct {
     name: ?[]const u8,
@@ -73,6 +79,15 @@ const TomlContent = struct {
     base: ?[]const u8,
     full: ?[]const u8,
     altgr: ?[]const u8,
+    spacebar: ?TomlContentSpacebar,
+};
+
+const TomlContentSpacebar = struct {
+    shift: ?[]const u8,
+    altgr: ?[]const u8,
+    altgr_shift: ?[]const u8,
+    @"1dk": ?[]const u8,
+    @"1dk_shift": ?[]const u8,
 };
 
 pub const KeyboardLayout = struct {
@@ -95,7 +110,7 @@ pub const KeyboardLayout = struct {
     url: ?[]const u8,
     version: ?[]const u8,
     geometry: Geometry,
-    layers: std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []u8)),
+    layers: std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []const u8)),
     has_altgr: bool = false,
     has_1dk: bool = false,
 
@@ -173,9 +188,9 @@ pub const KeyboardLayout = struct {
             return ParsingError.MissingAttribute;
         };
 
-        var layers = std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []u8)).empty;
+        var layers = std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []const u8)).empty;
         for (std.enums.values(Layer)) |layer| {
-            try layers.put(arena, layer, std.AutoHashMapUnmanaged(KeyCode, []u8).empty);
+            try layers.put(arena, layer, std.AutoHashMapUnmanaged(KeyCode, []const u8).empty);
         }
 
         var keyboard_layout = KeyboardLayout{
@@ -209,13 +224,11 @@ pub const KeyboardLayout = struct {
         } else if (parsed_toml.base) |base_to_parse| {
             if (options.diagnostic) |diag| diag.arg = "base";
 
-            // FIXME: commented to test error handling
-            _ = base_to_parse;
-            // var keymap = try layout_parser.parseLayout(allocator, keyboard_layout.geometry, base_to_parse, options);
-            // defer keymap.deinit(allocator);
+            var keymap = try layout_parser.parseLayout(allocator, keyboard_layout.geometry, base_to_parse, options);
+            defer keymap.deinit(allocator);
 
-            // try keyboard_layout.parseTemplate(allocator, &keymap, Layer.base, options);
-            // try keyboard_layout.parseTemplate(allocator, &keymap, Layer.odk, options);
+            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.base, options);
+            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.odk, options);
 
             if (parsed_toml.altgr) |altgr_to_parse| {
                 if (options.diagnostic) |diag| diag.arg = "altgr";
@@ -233,8 +246,76 @@ pub const KeyboardLayout = struct {
             return ParsingError.MissingLayout;
         }
 
-        // TODO: kalamine/layout.py:192
-        // all other missing features like space bar or angle-mod
+        // Spacebar
+        // TODO: test with Ergo‑L if unicode char is decoded
+        var spacebar_shift: ?[]const u8 = null;
+        var spacebar_altgr: ?[]const u8 = null;
+        var spacebar_altgr_shift: ?[]const u8 = null;
+        var spacebar_odk: ?[]const u8 = null;
+        var spacebar_odk_shift: ?[]const u8 = null;
+
+        if (parsed_toml.spacebar) |spacebar_to_parse| {
+            if (spacebar_to_parse.shift) |shift| {
+                spacebar_shift = shift;
+            }
+            if (spacebar_to_parse.altgr) |altgr| {
+                spacebar_altgr = altgr;
+            }
+            if (spacebar_to_parse.altgr_shift) |altgr_shift| {
+                spacebar_altgr_shift = altgr_shift;
+            }
+            if (spacebar_to_parse.@"1dk") |odk| {
+                spacebar_odk = odk;
+            }
+            if (spacebar_to_parse.@"1dk_shift") |odk_shift| {
+                spacebar_odk_shift = odk_shift;
+            }
+        }
+
+        var layer_map = keyboard_layout.layers.getPtr(.base).?;
+        try layer_map.put(arena, .spce, default_spacebar_base);
+
+        var layer_map_shift = keyboard_layout.layers.getPtr(.shift).?;
+        try layer_map_shift.put(
+            arena,
+            .spce,
+            spacebar_shift orelse default_spacebar_shift,
+        );
+
+        if (keyboard_layout.layers.getPtr(.altgr)) |layer_map_altgr| {
+            try layer_map_altgr.put(
+                arena,
+                .spce,
+                spacebar_altgr orelse default_spacebar_altgr,
+            );
+        }
+
+        if (keyboard_layout.layers.getPtr(.altgr_shift)) |layer_map_altgr_shift| {
+            try layer_map_altgr_shift.put(
+                arena,
+                .spce,
+                spacebar_altgr_shift orelse default_spacebar_altgr_shift,
+            );
+        }
+
+        if (keyboard_layout.layers.getPtr(.odk)) |layer_map_odk| {
+            try layer_map_odk.put(
+                arena,
+                .spce,
+                spacebar_odk orelse default_spacebar_odk,
+            );
+        }
+
+        if (keyboard_layout.layers.getPtr(.odk_shift)) |layer_map_odk_shift| {
+            try layer_map_odk_shift.put(
+                arena,
+                .spce,
+                spacebar_odk_shift orelse default_spacebar_odk_shift,
+            );
+        }
+
+        // TODO: kalamine/layout.py:222 _parse_dead_keys
+        // all other missing features like angle-mod
 
         return keyboard_layout;
     }
@@ -373,6 +454,7 @@ pub const KeyCode = enum {
     bksl,
     lsgt,
     tlde,
+    spce,
 };
 
 const iso_template =
