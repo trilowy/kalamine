@@ -19,13 +19,14 @@ pub fn run(allocator: std.mem.Allocator, options: Options, parse_options: ParseO
     // TODO: at the end, check if the result is the same than the Python version
     // TODO: at the end of coding this function "new", see if there is useless imports
     // TODO: check if 2 kinds of "é" can be compared
+    // const str = "He\u{301}"; // Hé
     // TODO: replace stdout by a file and put it nearer to were it is used
     // https://pedropark99.github.io/zig-book/Chapters/12-file-op.html
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    // Make a KeyboardLayout, just to get the ASCII arts
+    // Make a dummy keyboard layout to get full Qwerty example parsed
     var keyboard_layout = try dummyLayout(allocator, &options, parse_options);
     defer keyboard_layout.deinit();
 
@@ -36,26 +37,39 @@ pub fn run(allocator: std.mem.Allocator, options: Options, parse_options: ParseO
     keyboard_layout.geometry = options.geometry;
 
     // Write an ASCII art description of a default layout
-    // TODO: kalamine/help.py:145
-    // TODO: kalamine/help.py:111
-    // const base = if (options.odk) dummy_odk_layout else dummy_alpha_layout;
-    const base = try toml_generator.getBase(allocator, &keyboard_layout);
-    defer allocator.free(base);
+    if (options.odk) {
+        // TODO: kalamine/layout.py:404
+        // TODO: kalamine/help.py:116 draw_layout
+        // TODO: kalamine/help.py:145
+        const base = try toml_generator.getBase(allocator, &keyboard_layout);
+        defer allocator.free(base);
 
-    try stdout.print(dummy_layer, .{ "base", base });
+        try stdout.print(dummy_layer, .{ "base", base });
 
-    if (options.altgr) {
-        // TODO:
-        // try stdout.print(dummy_layer, .{ "altgr", dummy_altgr_layout });
-        const altgr = try toml_generator.getAltgr(allocator, &keyboard_layout);
-        defer allocator.free(altgr);
+        if (options.altgr) {
+            const altgr = try toml_generator.getAltgr(allocator, &keyboard_layout);
+            defer allocator.free(altgr);
 
-        try stdout.print(dummy_layer, .{ "altgr", altgr });
+            try stdout.print(dummy_layer, .{ "altgr", altgr });
+        }
+
+        try stdout.writeAll(dummy_spacebar_odk);
+    } else if (options.altgr) {
+        const full = try toml_generator.getFull(allocator, &keyboard_layout);
+        defer allocator.free(full);
+
+        try stdout.print(dummy_layer, .{ "full", full });
+    } else {
+        const base = try toml_generator.getBase(allocator, &keyboard_layout);
+        defer allocator.free(base);
+
+        try stdout.print(dummy_layer, .{ "base", base });
     }
 
-    try stdout.flush();
+    // TODO: kalamine/help.py:149
+    // TODO: kalamine/help.py:47 user_guide.yaml
 
-    // TODO: kalamine/help.py:96 web scan codes
+    try stdout.flush();
 }
 
 /// Create a dummy (QWERTY) layout with the given characteristics
@@ -76,6 +90,8 @@ fn dummyLayout(
     if (options.altgr) {
         try file_content.print(allocator, dummy_layer, .{ "altgr", dummy_altgr_layout });
     }
+
+    // TODO: kalamine/help.py:96 web scan codes, needed for the web?
 
     var reader = std.Io.Reader.fixed(file_content.items);
     return KeyboardLayout.initFromToml(allocator, &reader, parse_options);
@@ -162,4 +178,12 @@ const dummy_altgr_layout =
     \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
     \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl  ┃
     \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+;
+
+const dummy_spacebar_odk =
+    \\
+    \\[spacebar]
+    \\1dk         = "'"  # apostrophe
+    \\1dk_shift   = "'"  # apostrophe
+    \\
 ;

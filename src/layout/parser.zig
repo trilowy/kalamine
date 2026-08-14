@@ -15,6 +15,9 @@ pub const ParsedKey = struct {
     right_down: ?[]const u8 = null,
 };
 
+pub const nb_lines_per_key = 3;
+pub const nb_columns_per_key = 6;
+
 /// Extract a keyboard layout
 /// Caller is responsible of freeing memory
 /// Inner character memory is bound to the layout parameter
@@ -26,9 +29,6 @@ pub fn parseLayout(
 ) !std.AutoHashMapUnmanaged(KeyCode, ParsedKey) {
     const graph = try Graphemes.init(allocator);
     defer graph.deinit(allocator);
-
-    const nb_lines_per_key = 3;
-    const nb_columns_per_key = 6;
 
     const template = expected_geometry.getTemplate();
     const keys = expected_geometry.getKeys();

@@ -91,7 +91,8 @@ fn execute(
 
 // Run all tests of all modules added here
 test {
-    _ = @import("cli/cli.zig");
     _ = @import("cli/ArgParser.zig");
+    _ = @import("cli/cli.zig");
+    _ = @import("generator/toml.zig");
     _ = @import("layout/parser.zig");
 }

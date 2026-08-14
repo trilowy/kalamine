@@ -54,7 +54,7 @@ pub const Layer = enum {
     altgr,
     altgr_shift,
 
-    fn shifted(self: Layer) Layer {
+    pub fn shifted(self: Layer) Layer {
         return switch (self) {
             .base => .shift,
             .shift => .shift,
@@ -214,9 +214,9 @@ pub const KeyboardLayout = struct {
             var keymap = try layout_parser.parseLayout(allocator, keyboard_layout.geometry, full_to_parse, options);
             defer keymap.deinit(allocator);
 
-            // TODO: loop on multiple layers at the same time?
-            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.base, options);
-            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.altgr, options);
+            // PERF: loop on multiple layers at the same time?
+            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.base);
+            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.altgr);
 
             keyboard_layout.has_altgr = true;
 
@@ -227,8 +227,8 @@ pub const KeyboardLayout = struct {
             var keymap = try layout_parser.parseLayout(allocator, keyboard_layout.geometry, base_to_parse, options);
             defer keymap.deinit(allocator);
 
-            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.base, options);
-            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.odk, options);
+            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.base);
+            try keyboard_layout.parseTemplate(allocator, &keymap, Layer.odk);
 
             if (parsed_toml.altgr) |altgr_to_parse| {
                 if (options.diagnostic) |diag| diag.arg = "altgr";
@@ -236,7 +236,7 @@ pub const KeyboardLayout = struct {
                 var altgr_keymap = try layout_parser.parseLayout(allocator, keyboard_layout.geometry, altgr_to_parse, options);
                 defer altgr_keymap.deinit(allocator);
 
-                try keyboard_layout.parseTemplate(allocator, &altgr_keymap, Layer.altgr, options);
+                try keyboard_layout.parseTemplate(allocator, &altgr_keymap, Layer.altgr);
 
                 keyboard_layout.has_altgr = true;
             }
@@ -315,7 +315,10 @@ pub const KeyboardLayout = struct {
         }
 
         // TODO: kalamine/layout.py:222 _parse_dead_keys
-        // all other missing features like angle-mod
+        // dead_keys.yaml to put in constant
+        // I do dead_keys later to see how it is used and write the best data structure for the job
+
+        // TODO: all other missing features like angle-mod
 
         return keyboard_layout;
     }
@@ -331,7 +334,6 @@ pub const KeyboardLayout = struct {
         allocator: std.mem.Allocator,
         keymap: *const std.AutoHashMapUnmanaged(KeyCode, ParsedKey),
         layer: Layer,
-        options: ParseOptions,
     ) !void {
         const arena = self.arena_allocator.allocator();
 
@@ -384,7 +386,6 @@ pub const KeyboardLayout = struct {
 
         // TODO: kalamine/layout.py:311
         // dead_keys set
-        _ = options;
     }
 
     // TODO: kalamine/layout.py:403
