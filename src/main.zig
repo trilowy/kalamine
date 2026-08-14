@@ -64,14 +64,15 @@ fn execute(
             try build.run(options); // TODO: handle error
         },
         .new => |options| {
-            // TODO: to implement
+            // TODO: to finish implementation
             var diag = Diagnostic{ .allocator = allocator };
             defer diag.deinit();
 
             new.run(allocator, options, .{ .diagnostic = &diag }) catch |err| {
                 return diag.report(stdout, err);
-                // TODO: no error for new layout but report error at higher level for build
-            }; // TODO: handle error
+                // TODO: do not error handling to do here, just try or panic, 'new' never fails
+                // but use this error reporting for 'build'
+            };
         },
         .watch => |options| {
             // TODO: to implement

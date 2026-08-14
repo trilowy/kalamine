@@ -17,31 +17,19 @@ pub const Options = struct {
 /// Create a new TOML layout description
 pub fn run(allocator: std.mem.Allocator, options: Options, parse_options: ParseOptions) !void {
     // TODO: at the end, check if the result is the same than the Python version
+    // TODO: at the end of coding this function "new", see if there is useless imports
+    // TODO: check if 2 kinds of "é" can be compared
     // TODO: replace stdout by a file and put it nearer to were it is used
     // https://pedropark99.github.io/zig-book/Chapters/12-file-op.html
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    // TODO: test of toml
-    // var diag = layout.Diagnostic{};
-    // var keyboard_layout = KeyboardLayout.initFromToml(allocator, &reader, .{ .diagnostic = &diag }) catch |err| {
-    //     return diag.report(stdout, err);
-    //     // TODO: no error for new layout but report error at higher level for build
-    // };
-    // TODO: find the leak with the help of error report up here or tests
-    // TODO: at the end of coding this function "new", see if there is useless imports
-
-    // TODO: check if 2 kinds of "é" can be compared
-
     // Make a KeyboardLayout, just to get the ASCII arts
     var keyboard_layout = try dummyLayout(allocator, &options, parse_options);
-    // var keyboard_layout = dummyLayout(allocator, &options, parse_options) catch |err| {
-    //     return diag.report(stdout, err);
-    //     // TODO: no error for new layout but report error at higher level for build
-    // };
     defer keyboard_layout.deinit();
-    std.debug.print("parse\n{any}\n", .{keyboard_layout});
+
+    std.debug.print("parse\n{any}\n", .{keyboard_layout}); // TODO: delete
 
     try stdout.writeAll(dummy_metadata);
     try stdout.print(dummy_geometry, .{@tagName(options.geometry)});
