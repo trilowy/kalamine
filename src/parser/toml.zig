@@ -89,7 +89,7 @@ pub fn parseKeyboardLayoutFromToml(
     const name8 = if (parsed_toml.name8) |name8|
         try arena.dupe(u8, name8)
     else
-        try arena.dupe(u8, name[0..8]);
+        try arena.dupe(u8, name[0..@min(name.len, 8)]);
 
     const locale = if (parsed_toml.locale) |locale|
         try arena.dupe(u8, locale)
@@ -196,19 +196,19 @@ pub fn parseKeyboardLayoutFromToml(
 
     if (parsed_toml.spacebar) |spacebar_to_parse| {
         if (spacebar_to_parse.shift) |shift| {
-            spacebar_shift = shift;
+            spacebar_shift = try arena.dupe(u8, shift);
         }
         if (spacebar_to_parse.altgr) |altgr| {
-            spacebar_altgr = altgr;
+            spacebar_altgr = try arena.dupe(u8, altgr);
         }
         if (spacebar_to_parse.altgr_shift) |altgr_shift| {
-            spacebar_altgr_shift = altgr_shift;
+            spacebar_altgr_shift = try arena.dupe(u8, altgr_shift);
         }
         if (spacebar_to_parse.@"1dk") |odk| {
-            spacebar_odk = odk;
+            spacebar_odk = try arena.dupe(u8, odk);
         }
         if (spacebar_to_parse.@"1dk_shift") |odk_shift| {
-            spacebar_odk_shift = odk_shift;
+            spacebar_odk_shift = try arena.dupe(u8, odk_shift);
         }
     }
 
