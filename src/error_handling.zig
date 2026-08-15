@@ -29,9 +29,11 @@ pub const Diagnostic = struct {
     pub fn deinit(self: *Diagnostic) void {
         if (self.expected) |expected| {
             self.allocator.free(expected);
+            self.expected = null;
         }
         if (self.found) |found| {
             self.allocator.free(found);
+            self.found = null;
         }
     }
 

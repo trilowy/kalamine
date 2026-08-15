@@ -78,6 +78,7 @@ fn fillTemplate(
     const template = keyboard_layout.geometry.getTemplate();
 
     var template_to_fill = std.ArrayList(u8).empty;
+    errdefer template_to_fill.deinit(allocator);
 
     var rows_idx: usize = 0;
     var rows_keys_idx: usize = 0;
