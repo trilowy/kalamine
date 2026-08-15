@@ -1,10 +1,10 @@
 const std = @import("std");
 const toml = @import("toml");
-const layout_parser = @import("parser.zig");
+const layout_parser = @import("parser/toml.zig");
 const ParsedKey = layout_parser.ParsedKey;
 const LetterCasing = @import("LetterCasing");
 const Graphemes = @import("Graphemes");
-const error_handling = @import("../error_handling.zig");
+const error_handling = @import("error_handling.zig");
 const ParseOptions = error_handling.ParseOptions;
 const ParsingError = error_handling.ParsingError;
 

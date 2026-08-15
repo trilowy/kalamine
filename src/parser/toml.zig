@@ -1,10 +1,11 @@
 const std = @import("std");
-const Geometry = @import("layout.zig").Geometry;
+const layout_mod = @import("../layout.zig");
+const Geometry = layout_mod.Geometry;
+const KeyCode = layout_mod.KeyCode;
 const error_handling = @import("../error_handling.zig");
 const ParseOptions = error_handling.ParseOptions;
 const Diagnostic = error_handling.Diagnostic;
 const ParsingError = error_handling.ParsingError;
-const KeyCode = @import("layout.zig").KeyCode;
 const Graphemes = @import("Graphemes");
 const Grapheme = Graphemes.Grapheme;
 

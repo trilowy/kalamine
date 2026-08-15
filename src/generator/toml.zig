@@ -4,11 +4,11 @@ const std = @import("std");
 const Graphemes = @import("Graphemes");
 const Grapheme = Graphemes.Grapheme;
 const LetterCasing = @import("LetterCasing");
-const layout = @import("../layout/layout.zig");
+const layout = @import("../layout.zig");
 const KeyboardLayout = layout.KeyboardLayout;
 const Layer = layout.Layer;
 const KeyCode = layout.KeyCode;
-const layout_parser = @import("../layout/parser.zig");
+const layout_parser = @import("../parser/toml.zig");
 const nb_lines_per_key = layout_parser.nb_lines_per_key;
 const nb_columns_per_key = layout_parser.nb_columns_per_key;
 

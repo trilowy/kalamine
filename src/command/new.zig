@@ -1,5 +1,5 @@
 const std = @import("std");
-const layout = @import("../layout/layout.zig");
+const layout = @import("../layout.zig");
 const Geometry = layout.Geometry;
 const KeyboardLayout = layout.KeyboardLayout;
 const toml_generator = @import("../generator/toml.zig");

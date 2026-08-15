@@ -94,5 +94,5 @@ test {
     _ = @import("cli/ArgParser.zig");
     _ = @import("cli/cli.zig");
     _ = @import("generator/toml.zig");
-    _ = @import("layout/parser.zig");
+    _ = @import("parser/toml.zig");
 }

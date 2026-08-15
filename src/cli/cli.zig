@@ -6,7 +6,7 @@ const Command = @import("../command/command.zig").Command;
 const build = @import("../command/build.zig");
 const new = @import("../command/new.zig");
 const watch = @import("../command/watch.zig");
-const Geometry = @import("../layout/layout.zig").Geometry;
+const Geometry = @import("../layout.zig").Geometry;
 
 /// Parse program arguments
 pub fn parse(args: []const []const u8) Error!Command {
