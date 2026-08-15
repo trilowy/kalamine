@@ -199,15 +199,19 @@ pub fn parseKeyboardLayoutFromToml(
             spacebar_shift = try arena.dupe(u8, shift);
         }
         if (spacebar_to_parse.altgr) |altgr| {
+            keyboard_layout.has_altgr = true;
             spacebar_altgr = try arena.dupe(u8, altgr);
         }
         if (spacebar_to_parse.altgr_shift) |altgr_shift| {
+            keyboard_layout.has_altgr = true;
             spacebar_altgr_shift = try arena.dupe(u8, altgr_shift);
         }
         if (spacebar_to_parse.@"1dk") |odk| {
+            keyboard_layout.has_1dk = true;
             spacebar_odk = try arena.dupe(u8, odk);
         }
         if (spacebar_to_parse.@"1dk_shift") |odk_shift| {
+            keyboard_layout.has_1dk = true;
             spacebar_odk_shift = try arena.dupe(u8, odk_shift);
         }
     }
@@ -223,35 +227,43 @@ pub fn parseKeyboardLayoutFromToml(
     );
 
     if (keyboard_layout.layers.getPtr(.altgr)) |layer_map_altgr| {
-        try layer_map_altgr.put(
-            arena,
-            .spce,
-            spacebar_altgr orelse default_spacebar_altgr,
-        );
+        if (keyboard_layout.has_altgr) {
+            try layer_map_altgr.put(
+                arena,
+                .spce,
+                spacebar_altgr orelse default_spacebar_altgr,
+            );
+        }
     }
 
     if (keyboard_layout.layers.getPtr(.altgr_shift)) |layer_map_altgr_shift| {
-        try layer_map_altgr_shift.put(
-            arena,
-            .spce,
-            spacebar_altgr_shift orelse default_spacebar_altgr_shift,
-        );
+        if (keyboard_layout.has_altgr) {
+            try layer_map_altgr_shift.put(
+                arena,
+                .spce,
+                spacebar_altgr_shift orelse default_spacebar_altgr_shift,
+            );
+        }
     }
 
     if (keyboard_layout.layers.getPtr(.odk)) |layer_map_odk| {
-        try layer_map_odk.put(
-            arena,
-            .spce,
-            spacebar_odk orelse default_spacebar_odk,
-        );
+        if (keyboard_layout.has_1dk) {
+            try layer_map_odk.put(
+                arena,
+                .spce,
+                spacebar_odk orelse default_spacebar_odk,
+            );
+        }
     }
 
     if (keyboard_layout.layers.getPtr(.odk_shift)) |layer_map_odk_shift| {
-        try layer_map_odk_shift.put(
-            arena,
-            .spce,
-            spacebar_odk_shift orelse default_spacebar_odk_shift,
-        );
+        if (keyboard_layout.has_1dk) {
+            try layer_map_odk_shift.put(
+                arena,
+                .spce,
+                spacebar_odk_shift orelse default_spacebar_odk_shift,
+            );
+        }
     }
 
     // TODO: kalamine/layout.py:222 _parse_dead_keys
