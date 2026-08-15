@@ -351,6 +351,7 @@ pub const KeyboardLayout = struct {
 
             if (layer == .base) {
                 if (parsed_key.left_up) |shift_key| {
+                    self.setOdkIfThereIs(shift_key);
                     const key_to_put_shift = try arena.dupe(u8, shift_key);
                     try layer_map_shift.put(arena, key_code, key_to_put_shift);
 
@@ -362,11 +363,13 @@ pub const KeyboardLayout = struct {
                 }
 
                 if (parsed_key.left_down) |base_key| {
+                    self.setOdkIfThereIs(base_key);
                     const key_to_put_base = try arena.dupe(u8, base_key);
                     try layer_map.put(arena, key_code, key_to_put_base);
                 }
             } else if (layer == .altgr or layer == .odk) {
                 if (parsed_key.right_down) |base_key| {
+                    self.setOdkIfThereIs(base_key);
                     const key_to_put_base = try arena.dupe(u8, base_key);
                     try layer_map.put(arena, key_code, key_to_put_base);
 
@@ -378,6 +381,7 @@ pub const KeyboardLayout = struct {
                 }
 
                 if (parsed_key.right_up) |shift_key| {
+                    self.setOdkIfThereIs(shift_key);
                     const key_to_put_shift = try arena.dupe(u8, shift_key);
                     try layer_map_shift.put(arena, key_code, key_to_put_shift);
                 }
@@ -388,8 +392,11 @@ pub const KeyboardLayout = struct {
         // dead_keys set
     }
 
-    // TODO: kalamine/layout.py:403
-    // _get_geometry / _fill_template
+    fn setOdkIfThereIs(self: *KeyboardLayout, key: []const u8) void {
+        if (std.mem.eql(u8, "**", key)) {
+            self.has_1dk = true;
+        }
+    }
 };
 
 // TODO: kalamine/layout.py:276

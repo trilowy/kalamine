@@ -244,6 +244,7 @@ fn putKeyOrDeadKey(
             // Dead key '*' to keep before layout char
             key.* = layout[(lc.offset - 1)..][0..(lc.len + 1)];
             // TODO: do we check here that it is a valid dead key?
+            // TODO: kalamine/layout.py:311
         } else {
             // Dead key followed by a space
             return options.setParsingError(

@@ -58,16 +58,20 @@ fn fillTemplate(
     var altgr_odk_layer_shift: ?std.AutoHashMapUnmanaged(KeyCode, []const u8) = null;
 
     if (layers[0] == .base) {
-        base_layer = keyboard_layout.layers.get(layers[0]) orelse unreachable;
-        base_layer_shift = keyboard_layout.layers.get(layers[0].shifted()) orelse unreachable;
-    } else if (layers[0] == .altgr or layers[0] == .odk) {
-        altgr_odk_layer = keyboard_layout.layers.get(layers[0]) orelse unreachable;
-        altgr_odk_layer_shift = keyboard_layout.layers.get(layers[0].shifted()) orelse unreachable;
+        base_layer = keyboard_layout.layers.get(layers[0]);
+        base_layer_shift = keyboard_layout.layers.get(layers[0].shifted());
+    } else if ((layers[0] == .altgr and keyboard_layout.has_altgr) or
+        (layers[0] == .odk and keyboard_layout.has_1dk))
+    {
+        altgr_odk_layer = keyboard_layout.layers.get(layers[0]);
+        altgr_odk_layer_shift = keyboard_layout.layers.get(layers[0].shifted());
     }
 
-    if (layers[1] == .altgr or layers[1] == .odk) {
-        altgr_odk_layer = keyboard_layout.layers.get(layers[1].?) orelse unreachable;
-        altgr_odk_layer_shift = keyboard_layout.layers.get(layers[1].?.shifted()) orelse unreachable;
+    if ((layers[1] == .altgr and keyboard_layout.has_altgr) or
+        (layers[1] == .odk and keyboard_layout.has_1dk))
+    {
+        altgr_odk_layer = keyboard_layout.layers.get(layers[1].?);
+        altgr_odk_layer_shift = keyboard_layout.layers.get(layers[1].?.shifted());
     }
 
     const rows = keyboard_layout.geometry.getKeys();
