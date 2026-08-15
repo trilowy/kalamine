@@ -3,6 +3,7 @@ const layout = @import("../layout.zig");
 const Geometry = layout.Geometry;
 const KeyboardLayout = layout.KeyboardLayout;
 const toml_generator = @import("../generator/toml.zig");
+const toml_parser = @import("../parser/toml.zig");
 const error_handling = @import("../error_handling.zig");
 const Diagnostic = error_handling.Diagnostic;
 const ParseOptions = error_handling.ParseOptions;
@@ -94,7 +95,7 @@ fn dummyLayout(
     // TODO: kalamine/help.py:96 web scan codes, needed for the web?
 
     var reader = std.Io.Reader.fixed(file_content.items);
-    return KeyboardLayout.initFromToml(allocator, &reader, parse_options);
+    return toml_parser.parseKeyboardLayoutFromToml(allocator, &reader, parse_options);
 }
 
 const dummy_metadata =

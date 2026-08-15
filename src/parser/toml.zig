@@ -1,11 +1,15 @@
 const std = @import("std");
+const toml = @import("toml");
 const layout_mod = @import("../layout.zig");
+const KeyboardLayout = layout_mod.KeyboardLayout;
+const Layer = layout_mod.Layer;
 const Geometry = layout_mod.Geometry;
 const KeyCode = layout_mod.KeyCode;
 const error_handling = @import("../error_handling.zig");
 const ParseOptions = error_handling.ParseOptions;
 const Diagnostic = error_handling.Diagnostic;
 const ParsingError = error_handling.ParsingError;
+const LetterCasing = @import("LetterCasing");
 const Graphemes = @import("Graphemes");
 const Grapheme = Graphemes.Grapheme;
 
@@ -19,10 +23,320 @@ pub const ParsedKey = struct {
 pub const nb_lines_per_key = 3;
 pub const nb_columns_per_key = 6;
 
+const default_spacebar_base = " ";
+const default_spacebar_shift = " ";
+const default_spacebar_altgr = " ";
+const default_spacebar_altgr_shift = " ";
+const default_spacebar_odk = "'";
+const default_spacebar_odk_shift = "'";
+
+const TomlContent = struct {
+    name: ?[]const u8,
+    name8: ?[]const u8,
+    locale: ?[]const u8,
+    variant: ?[]const u8,
+    author: ?[]const u8,
+    description: ?[]const u8,
+    url: ?[]const u8,
+    version: ?[]const u8,
+    geometry: ?Geometry,
+    base: ?[]const u8,
+    full: ?[]const u8,
+    altgr: ?[]const u8,
+    spacebar: ?TomlContentSpacebar,
+};
+
+const TomlContentSpacebar = struct {
+    shift: ?[]const u8,
+    altgr: ?[]const u8,
+    altgr_shift: ?[]const u8,
+    @"1dk": ?[]const u8,
+    @"1dk_shift": ?[]const u8,
+};
+
+/// Deinitialize with `deinit`
+/// In case of error, deinitialize the error message if present in options
+pub fn parseKeyboardLayoutFromToml(
+    allocator: std.mem.Allocator,
+    reader: *std.Io.Reader,
+    options: ParseOptions,
+) !KeyboardLayout {
+    // Read all
+    const toml_content: []const u8 = try reader.allocRemaining(allocator, .unlimited);
+    defer allocator.free(toml_content);
+
+    // Parse TOML
+    var toml_parser = toml.Parser(TomlContent).init(allocator);
+    defer toml_parser.deinit();
+
+    var result = try toml_parser.parseString(toml_content);
+    defer result.deinit();
+
+    const parsed_toml = result.value;
+
+    var arena_allocator = std.heap.ArenaAllocator.init(allocator);
+    const arena = arena_allocator.allocator();
+    errdefer arena_allocator.deinit();
+
+    // Own the memory of each field to free the rest
+    const name = if (parsed_toml.name) |name|
+        try arena.dupe(u8, name)
+    else {
+        if (options.diagnostic) |diag| diag.arg = "name";
+        return ParsingError.MissingAttribute;
+    };
+
+    const name8 = if (parsed_toml.name8) |name8|
+        try arena.dupe(u8, name8)
+    else
+        try arena.dupe(u8, name[0..8]);
+
+    const locale = if (parsed_toml.locale) |locale|
+        try arena.dupe(u8, locale)
+    else
+        null;
+
+    const variant = if (parsed_toml.variant) |variant|
+        try arena.dupe(u8, variant)
+    else
+        null;
+
+    const author = if (parsed_toml.author) |author|
+        try arena.dupe(u8, author)
+    else
+        null;
+
+    const description = if (parsed_toml.description) |description|
+        try arena.dupe(u8, description)
+    else
+        null;
+
+    const url = if (parsed_toml.url) |url|
+        try arena.dupe(u8, url)
+    else
+        null;
+
+    const version = if (parsed_toml.version) |version|
+        try arena.dupe(u8, version)
+    else
+        null;
+
+    const geometry = if (parsed_toml.geometry) |geometry|
+        geometry
+    else {
+        if (options.diagnostic) |diag| diag.arg = "geometry";
+        return ParsingError.MissingAttribute;
+    };
+
+    var layers = std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []const u8)).empty;
+    for (std.enums.values(Layer)) |layer| {
+        try layers.put(arena, layer, std.AutoHashMapUnmanaged(KeyCode, []const u8).empty);
+    }
+
+    var keyboard_layout = KeyboardLayout{
+        .arena_allocator = arena_allocator,
+        .name = name,
+        .name8 = name8,
+        .locale = locale,
+        .variant = variant,
+        .author = author,
+        .description = description,
+        .url = url,
+        .version = version,
+        .geometry = geometry,
+        .layers = layers,
+    };
+
+    // TODO: line of the TOML is better for the feedback in diagnostic
+    if (parsed_toml.full) |full_to_parse| {
+        if (options.diagnostic) |diag| diag.arg = "full";
+
+        var keymap = try parseLayout(allocator, keyboard_layout.geometry, full_to_parse, options);
+        defer keymap.deinit(allocator);
+
+        // PERF: loop on multiple layers at the same time?
+        try parseTemplate(allocator, &keyboard_layout, &keymap, Layer.base);
+        try parseTemplate(allocator, &keyboard_layout, &keymap, Layer.altgr);
+
+        keyboard_layout.has_altgr = true;
+
+        if (options.diagnostic) |diag| diag.arg = "";
+    } else if (parsed_toml.base) |base_to_parse| {
+        if (options.diagnostic) |diag| diag.arg = "base";
+
+        var keymap = try parseLayout(allocator, keyboard_layout.geometry, base_to_parse, options);
+        defer keymap.deinit(allocator);
+
+        try parseTemplate(allocator, &keyboard_layout, &keymap, Layer.base);
+        try parseTemplate(allocator, &keyboard_layout, &keymap, Layer.odk);
+
+        if (parsed_toml.altgr) |altgr_to_parse| {
+            if (options.diagnostic) |diag| diag.arg = "altgr";
+
+            var altgr_keymap = try parseLayout(allocator, keyboard_layout.geometry, altgr_to_parse, options);
+            defer altgr_keymap.deinit(allocator);
+
+            try parseTemplate(allocator, &keyboard_layout, &altgr_keymap, Layer.altgr);
+
+            keyboard_layout.has_altgr = true;
+        }
+
+        if (options.diagnostic) |diag| diag.arg = "";
+    } else {
+        return ParsingError.MissingLayout;
+    }
+
+    // Spacebar
+    // TODO: test with Ergo‑L if unicode char is decoded
+    var spacebar_shift: ?[]const u8 = null;
+    var spacebar_altgr: ?[]const u8 = null;
+    var spacebar_altgr_shift: ?[]const u8 = null;
+    var spacebar_odk: ?[]const u8 = null;
+    var spacebar_odk_shift: ?[]const u8 = null;
+
+    if (parsed_toml.spacebar) |spacebar_to_parse| {
+        if (spacebar_to_parse.shift) |shift| {
+            spacebar_shift = shift;
+        }
+        if (spacebar_to_parse.altgr) |altgr| {
+            spacebar_altgr = altgr;
+        }
+        if (spacebar_to_parse.altgr_shift) |altgr_shift| {
+            spacebar_altgr_shift = altgr_shift;
+        }
+        if (spacebar_to_parse.@"1dk") |odk| {
+            spacebar_odk = odk;
+        }
+        if (spacebar_to_parse.@"1dk_shift") |odk_shift| {
+            spacebar_odk_shift = odk_shift;
+        }
+    }
+
+    var layer_map = keyboard_layout.layers.getPtr(.base).?;
+    try layer_map.put(arena, .spce, default_spacebar_base);
+
+    var layer_map_shift = keyboard_layout.layers.getPtr(.shift).?;
+    try layer_map_shift.put(
+        arena,
+        .spce,
+        spacebar_shift orelse default_spacebar_shift,
+    );
+
+    if (keyboard_layout.layers.getPtr(.altgr)) |layer_map_altgr| {
+        try layer_map_altgr.put(
+            arena,
+            .spce,
+            spacebar_altgr orelse default_spacebar_altgr,
+        );
+    }
+
+    if (keyboard_layout.layers.getPtr(.altgr_shift)) |layer_map_altgr_shift| {
+        try layer_map_altgr_shift.put(
+            arena,
+            .spce,
+            spacebar_altgr_shift orelse default_spacebar_altgr_shift,
+        );
+    }
+
+    if (keyboard_layout.layers.getPtr(.odk)) |layer_map_odk| {
+        try layer_map_odk.put(
+            arena,
+            .spce,
+            spacebar_odk orelse default_spacebar_odk,
+        );
+    }
+
+    if (keyboard_layout.layers.getPtr(.odk_shift)) |layer_map_odk_shift| {
+        try layer_map_odk_shift.put(
+            arena,
+            .spce,
+            spacebar_odk_shift orelse default_spacebar_odk_shift,
+        );
+    }
+
+    // TODO: kalamine/layout.py:222 _parse_dead_keys
+    // dead_keys.yaml to put in constant
+    // I do dead_keys later to see how it is used and write the best data structure for the job
+
+    // TODO: all other missing features like angle-mod
+
+    return keyboard_layout;
+}
+
+/// Extract a keyboard layer from a template
+fn parseTemplate(
+    allocator: std.mem.Allocator,
+    keyboard_layout: *KeyboardLayout,
+    keymap: *const std.AutoHashMapUnmanaged(KeyCode, ParsedKey),
+    layer: Layer,
+) !void {
+    const arena = keyboard_layout.arena_allocator.allocator();
+
+    const case = try LetterCasing.init(allocator);
+    defer case.deinit(allocator);
+
+    var layer_map = keyboard_layout.layers.getPtr(layer).?;
+    var layer_map_shift = keyboard_layout.layers.getPtr(layer.shifted()).?;
+
+    var keymap_iter = keymap.iterator();
+
+    while (keymap_iter.next()) |entry| {
+        const key_code = entry.key_ptr.*;
+        const parsed_key = entry.value_ptr.*;
+
+        if (layer == .base) {
+            if (parsed_key.left_up) |shift_key| {
+                setOdkIfThereIs(keyboard_layout, shift_key);
+                const key_to_put_shift = try arena.dupe(u8, shift_key);
+                try layer_map_shift.put(arena, key_code, key_to_put_shift);
+
+                // In the base layer, if the base character is undefined, shift prevails
+                if (parsed_key.left_down == null) {
+                    const key_to_put_base = try case.toLowerStr(arena, key_to_put_shift);
+                    try layer_map.put(arena, key_code, key_to_put_base);
+                }
+            }
+
+            if (parsed_key.left_down) |base_key| {
+                setOdkIfThereIs(keyboard_layout, base_key);
+                const key_to_put_base = try arena.dupe(u8, base_key);
+                try layer_map.put(arena, key_code, key_to_put_base);
+            }
+        } else if (layer == .altgr or layer == .odk) {
+            if (parsed_key.right_down) |base_key| {
+                setOdkIfThereIs(keyboard_layout, base_key);
+                const key_to_put_base = try arena.dupe(u8, base_key);
+                try layer_map.put(arena, key_code, key_to_put_base);
+
+                // In other layers, if the shift character is undefined, base prevails
+                if (parsed_key.right_up == null) {
+                    const key_to_put_shift = try case.toUpperStr(arena, key_to_put_base);
+                    try layer_map_shift.put(arena, key_code, key_to_put_shift);
+                }
+            }
+
+            if (parsed_key.right_up) |shift_key| {
+                setOdkIfThereIs(keyboard_layout, shift_key);
+                const key_to_put_shift = try arena.dupe(u8, shift_key);
+                try layer_map_shift.put(arena, key_code, key_to_put_shift);
+            }
+        }
+    }
+
+    // TODO: kalamine/layout.py:311
+    // dead_keys set
+}
+
+fn setOdkIfThereIs(keyboard_layout: *KeyboardLayout, key: []const u8) void {
+    if (std.mem.eql(u8, "**", key)) {
+        keyboard_layout.has_1dk = true;
+    }
+}
+
 /// Extract a keyboard layout
 /// Caller is responsible of freeing memory
 /// Inner character memory is bound to the layout parameter
-pub fn parseLayout(
+fn parseLayout(
     allocator: std.mem.Allocator,
     expected_geometry: Geometry,
     layout: []const u8,
