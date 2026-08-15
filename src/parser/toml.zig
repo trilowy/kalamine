@@ -13,13 +13,6 @@ const LetterCasing = @import("LetterCasing");
 const Graphemes = @import("Graphemes");
 const Grapheme = Graphemes.Grapheme;
 
-pub const ParsedKey = struct {
-    left_up: ?[]const u8 = null,
-    left_down: ?[]const u8 = null,
-    right_up: ?[]const u8 = null,
-    right_down: ?[]const u8 = null,
-};
-
 pub const nb_lines_per_key = 3;
 pub const nb_columns_per_key = 6;
 
@@ -74,9 +67,125 @@ pub fn parseKeyboardLayoutFromToml(
 
     const parsed_toml = result.value;
 
+    var keyboard_layout = try initKeyboardLayoutWithMetadata(allocator, parsed_toml, options);
+    errdefer keyboard_layout.deinit();
+
+    // TODO: line of the TOML is better for the feedback in diagnostic
+    if (parsed_toml.full) |full_to_parse| {
+        if (options.diagnostic) |diag| diag.arg = "full";
+
+        try parseFullLayout(allocator, &keyboard_layout, full_to_parse, options);
+
+        if (options.diagnostic) |diag| diag.arg = "";
+    } else if (parsed_toml.base) |base_to_parse| {
+        if (options.diagnostic) |diag| diag.arg = "base";
+
+        try parseBaseLayout(allocator, &keyboard_layout, base_to_parse, options);
+
+        if (parsed_toml.altgr) |altgr_to_parse| {
+            if (options.diagnostic) |diag| diag.arg = "altgr";
+            try parseAltgrLayout(allocator, &keyboard_layout, altgr_to_parse, options);
+        }
+
+        if (options.diagnostic) |diag| diag.arg = "";
+    } else {
+        return ParsingError.MissingLayout;
+    }
+
+    const arena = keyboard_layout.arena_allocator.allocator();
+
+    // Spacebar
+    // TODO: test with Ergo‑L if unicode char is decoded
+    var spacebar_shift: ?[]const u8 = null;
+    var spacebar_altgr: ?[]const u8 = null;
+    var spacebar_altgr_shift: ?[]const u8 = null;
+    var spacebar_odk: ?[]const u8 = null;
+    var spacebar_odk_shift: ?[]const u8 = null;
+
+    if (parsed_toml.spacebar) |spacebar_to_parse| {
+        if (spacebar_to_parse.shift) |shift| {
+            spacebar_shift = try arena.dupe(u8, shift);
+        }
+        if (spacebar_to_parse.altgr) |altgr| {
+            keyboard_layout.has_altgr = true;
+            spacebar_altgr = try arena.dupe(u8, altgr);
+        }
+        if (spacebar_to_parse.altgr_shift) |altgr_shift| {
+            keyboard_layout.has_altgr = true;
+            spacebar_altgr_shift = try arena.dupe(u8, altgr_shift);
+        }
+        if (spacebar_to_parse.@"1dk") |odk| {
+            keyboard_layout.has_odk = true;
+            spacebar_odk = try arena.dupe(u8, odk);
+        }
+        if (spacebar_to_parse.@"1dk_shift") |odk_shift| {
+            keyboard_layout.has_odk = true;
+            spacebar_odk_shift = try arena.dupe(u8, odk_shift);
+        }
+    }
+
+    var layer_map = keyboard_layout.layers.getPtr(.base).?;
+    try layer_map.put(arena, .spce, default_spacebar_base);
+
+    var layer_map_shift = keyboard_layout.layers.getPtr(.shift).?;
+    try layer_map_shift.put(
+        arena,
+        .spce,
+        spacebar_shift orelse default_spacebar_shift,
+    );
+
+    if (keyboard_layout.layers.getPtr(.altgr)) |layer_map_altgr| {
+        try layer_map_altgr.put(
+            arena,
+            .spce,
+            spacebar_altgr orelse default_spacebar_altgr,
+        );
+    }
+
+    if (keyboard_layout.layers.getPtr(.altgr_shift)) |layer_map_altgr_shift| {
+        try layer_map_altgr_shift.put(
+            arena,
+            .spce,
+            spacebar_altgr_shift orelse default_spacebar_altgr_shift,
+        );
+    }
+
+    if (keyboard_layout.layers.getPtr(.odk)) |layer_map_odk| {
+        try layer_map_odk.put(
+            arena,
+            .spce,
+            spacebar_odk orelse default_spacebar_odk,
+        );
+    }
+
+    if (keyboard_layout.layers.getPtr(.odk_shift)) |layer_map_odk_shift| {
+        try layer_map_odk_shift.put(
+            arena,
+            .spce,
+            spacebar_odk_shift orelse default_spacebar_odk_shift,
+        );
+    }
+
+    // TODO: kalamine/layout.py:222 _parse_dead_keys
+    // dead_keys.yaml to put in constant
+    // I do dead_keys later to see how it is used and write the best data structure for the job
+
+    // TODO: all other missing features like angle-mod
+
+    return keyboard_layout;
+}
+
+fn initKeyboardLayoutWithMetadata(
+    allocator: std.mem.Allocator,
+    parsed_toml: TomlContent,
+    options: ParseOptions,
+) !KeyboardLayout {
     var arena_allocator = std.heap.ArenaAllocator.init(allocator);
-    const arena = arena_allocator.allocator();
     errdefer arena_allocator.deinit();
+
+    // The block is to scope this arena and avoid to use it after arena_allocator is copied
+    // into keyboard layout and create a memory leak and weird memory overwrite
+    const arena = arena_allocator.allocator();
 
     // Own the memory of each field to free the rest
     const name = if (parsed_toml.name) |name|
@@ -128,12 +237,12 @@ pub fn parseKeyboardLayoutFromToml(
         return ParsingError.MissingAttribute;
     };
 
-    var layers = std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []const u8)).empty;
-    for (std.enums.values(Layer)) |layer| {
-        try layers.put(arena, layer, std.AutoHashMapUnmanaged(KeyCode, []const u8).empty);
-    }
+    const layers = std.AutoHashMapUnmanaged(
+        Layer,
+        std.AutoHashMapUnmanaged(KeyCode, []const u8),
+    ).empty;
 
-    var keyboard_layout = KeyboardLayout{
+    return KeyboardLayout{
         .arena_allocator = arena_allocator,
         .name = name,
         .name8 = name8,
@@ -146,444 +255,338 @@ pub fn parseKeyboardLayoutFromToml(
         .geometry = geometry,
         .layers = layers,
     };
-
-    // TODO: line of the TOML is better for the feedback in diagnostic
-    if (parsed_toml.full) |full_to_parse| {
-        if (options.diagnostic) |diag| diag.arg = "full";
-
-        var keymap = try parseLayout(allocator, keyboard_layout.geometry, full_to_parse, options);
-        defer keymap.deinit(allocator);
-
-        // PERF: loop on multiple layers at the same time?
-        try parseTemplate(allocator, &keyboard_layout, &keymap, Layer.base);
-        try parseTemplate(allocator, &keyboard_layout, &keymap, Layer.altgr);
-
-        keyboard_layout.has_altgr = true;
-
-        if (options.diagnostic) |diag| diag.arg = "";
-    } else if (parsed_toml.base) |base_to_parse| {
-        if (options.diagnostic) |diag| diag.arg = "base";
-
-        var keymap = try parseLayout(allocator, keyboard_layout.geometry, base_to_parse, options);
-        defer keymap.deinit(allocator);
-
-        try parseTemplate(allocator, &keyboard_layout, &keymap, Layer.base);
-        try parseTemplate(allocator, &keyboard_layout, &keymap, Layer.odk);
-
-        if (parsed_toml.altgr) |altgr_to_parse| {
-            if (options.diagnostic) |diag| diag.arg = "altgr";
-
-            var altgr_keymap = try parseLayout(allocator, keyboard_layout.geometry, altgr_to_parse, options);
-            defer altgr_keymap.deinit(allocator);
-
-            try parseTemplate(allocator, &keyboard_layout, &altgr_keymap, Layer.altgr);
-
-            keyboard_layout.has_altgr = true;
-        }
-
-        if (options.diagnostic) |diag| diag.arg = "";
-    } else {
-        return ParsingError.MissingLayout;
-    }
-
-    // Spacebar
-    // TODO: test with Ergo‑L if unicode char is decoded
-    var spacebar_shift: ?[]const u8 = null;
-    var spacebar_altgr: ?[]const u8 = null;
-    var spacebar_altgr_shift: ?[]const u8 = null;
-    var spacebar_odk: ?[]const u8 = null;
-    var spacebar_odk_shift: ?[]const u8 = null;
-
-    if (parsed_toml.spacebar) |spacebar_to_parse| {
-        if (spacebar_to_parse.shift) |shift| {
-            spacebar_shift = try arena.dupe(u8, shift);
-        }
-        if (spacebar_to_parse.altgr) |altgr| {
-            keyboard_layout.has_altgr = true;
-            spacebar_altgr = try arena.dupe(u8, altgr);
-        }
-        if (spacebar_to_parse.altgr_shift) |altgr_shift| {
-            keyboard_layout.has_altgr = true;
-            spacebar_altgr_shift = try arena.dupe(u8, altgr_shift);
-        }
-        if (spacebar_to_parse.@"1dk") |odk| {
-            keyboard_layout.has_1dk = true;
-            spacebar_odk = try arena.dupe(u8, odk);
-        }
-        if (spacebar_to_parse.@"1dk_shift") |odk_shift| {
-            keyboard_layout.has_1dk = true;
-            spacebar_odk_shift = try arena.dupe(u8, odk_shift);
-        }
-    }
-
-    var layer_map = keyboard_layout.layers.getPtr(.base).?;
-    try layer_map.put(arena, .spce, default_spacebar_base);
-
-    var layer_map_shift = keyboard_layout.layers.getPtr(.shift).?;
-    try layer_map_shift.put(
-        arena,
-        .spce,
-        spacebar_shift orelse default_spacebar_shift,
-    );
-
-    if (keyboard_layout.layers.getPtr(.altgr)) |layer_map_altgr| {
-        if (keyboard_layout.has_altgr) {
-            try layer_map_altgr.put(
-                arena,
-                .spce,
-                spacebar_altgr orelse default_spacebar_altgr,
-            );
-        }
-    }
-
-    if (keyboard_layout.layers.getPtr(.altgr_shift)) |layer_map_altgr_shift| {
-        if (keyboard_layout.has_altgr) {
-            try layer_map_altgr_shift.put(
-                arena,
-                .spce,
-                spacebar_altgr_shift orelse default_spacebar_altgr_shift,
-            );
-        }
-    }
-
-    if (keyboard_layout.layers.getPtr(.odk)) |layer_map_odk| {
-        if (keyboard_layout.has_1dk) {
-            try layer_map_odk.put(
-                arena,
-                .spce,
-                spacebar_odk orelse default_spacebar_odk,
-            );
-        }
-    }
-
-    if (keyboard_layout.layers.getPtr(.odk_shift)) |layer_map_odk_shift| {
-        if (keyboard_layout.has_1dk) {
-            try layer_map_odk_shift.put(
-                arena,
-                .spce,
-                spacebar_odk_shift orelse default_spacebar_odk_shift,
-            );
-        }
-    }
-
-    // TODO: kalamine/layout.py:222 _parse_dead_keys
-    // dead_keys.yaml to put in constant
-    // I do dead_keys later to see how it is used and write the best data structure for the job
-
-    // TODO: all other missing features like angle-mod
-
-    return keyboard_layout;
 }
 
-/// Extract a keyboard layer from a template
-fn parseTemplate(
+/// Base + 1dk layers
+fn parseBaseLayout(
     allocator: std.mem.Allocator,
     keyboard_layout: *KeyboardLayout,
-    keymap: *const std.AutoHashMapUnmanaged(KeyCode, ParsedKey),
-    layer: Layer,
+    layout_to_parse: []const u8,
+    options: ParseOptions,
+) !void {
+    const layers = .{ .base, .odk };
+    return parseLayout(allocator, keyboard_layout, layout_to_parse, layers, options);
+}
+
+/// Base + AltGr layers
+fn parseFullLayout(
+    allocator: std.mem.Allocator,
+    keyboard_layout: *KeyboardLayout,
+    layout_to_parse: []const u8,
+    options: ParseOptions,
+) !void {
+    const layers = .{ .base, .altgr };
+    return parseLayout(allocator, keyboard_layout, layout_to_parse, layers, options);
+}
+
+/// AltGr layer only
+fn parseAltgrLayout(
+    allocator: std.mem.Allocator,
+    keyboard_layout: *KeyboardLayout,
+    layout_to_parse: []const u8,
+    options: ParseOptions,
+) !void {
+    const layers = .{ .altgr, null };
+    return parseLayout(allocator, keyboard_layout, layout_to_parse, layers, options);
+}
+
+/// Parse a layout according to the keyboard layout geometry with requested layers and put them in
+/// keyboard layout
+fn parseLayout(
+    allocator: std.mem.Allocator,
+    keyboard_layout: *KeyboardLayout,
+    layout_to_parse: []const u8,
+    layers: struct { Layer, ?Layer },
+    options: ParseOptions,
 ) !void {
     const arena = keyboard_layout.arena_allocator.allocator();
+
+    const graph = try Graphemes.init(allocator);
+    defer graph.deinit(allocator);
 
     const case = try LetterCasing.init(allocator);
     defer case.deinit(allocator);
 
-    var layer_map = keyboard_layout.layers.getPtr(layer).?;
-    var layer_map_shift = keyboard_layout.layers.getPtr(layer.shifted()).?;
+    var base_layer: ?std.AutoHashMapUnmanaged(KeyCode, []const u8) = null;
+    var base_layer_shift: ?std.AutoHashMapUnmanaged(KeyCode, []const u8) = null;
 
-    var keymap_iter = keymap.iterator();
+    var altgr_odk_layer: ?std.AutoHashMapUnmanaged(KeyCode, []const u8) = null;
+    var altgr_odk_layer_shift: ?std.AutoHashMapUnmanaged(KeyCode, []const u8) = null;
+    var altgr_odk_layer_type: ?Layer = null;
 
-    while (keymap_iter.next()) |entry| {
-        const key_code = entry.key_ptr.*;
-        const parsed_key = entry.value_ptr.*;
-
-        if (layer == .base) {
-            if (parsed_key.left_up) |shift_key| {
-                setOdkIfThereIs(keyboard_layout, shift_key);
-                const key_to_put_shift = try arena.dupe(u8, shift_key);
-                try layer_map_shift.put(arena, key_code, key_to_put_shift);
-
-                // In the base layer, if the base character is undefined, shift prevails
-                if (parsed_key.left_down == null) {
-                    const key_to_put_base = try case.toLowerStr(arena, key_to_put_shift);
-                    try layer_map.put(arena, key_code, key_to_put_base);
-                }
-            }
-
-            if (parsed_key.left_down) |base_key| {
-                setOdkIfThereIs(keyboard_layout, base_key);
-                const key_to_put_base = try arena.dupe(u8, base_key);
-                try layer_map.put(arena, key_code, key_to_put_base);
-            }
-        } else if (layer == .altgr or layer == .odk) {
-            if (parsed_key.right_down) |base_key| {
-                setOdkIfThereIs(keyboard_layout, base_key);
-                const key_to_put_base = try arena.dupe(u8, base_key);
-                try layer_map.put(arena, key_code, key_to_put_base);
-
-                // In other layers, if the shift character is undefined, base prevails
-                if (parsed_key.right_up == null) {
-                    const key_to_put_shift = try case.toUpperStr(arena, key_to_put_base);
-                    try layer_map_shift.put(arena, key_code, key_to_put_shift);
-                }
-            }
-
-            if (parsed_key.right_up) |shift_key| {
-                setOdkIfThereIs(keyboard_layout, shift_key);
-                const key_to_put_shift = try arena.dupe(u8, shift_key);
-                try layer_map_shift.put(arena, key_code, key_to_put_shift);
-            }
-        }
+    if (layers[0] == .base) {
+        // Base layers are always in keyboard layout
+        base_layer = .empty;
+        base_layer_shift = .empty;
     }
 
-    // TODO: kalamine/layout.py:311
-    // dead_keys set
-}
-
-fn setOdkIfThereIs(keyboard_layout: *KeyboardLayout, key: []const u8) void {
-    if (std.mem.eql(u8, "**", key)) {
-        keyboard_layout.has_1dk = true;
+    if (layers[0] == .altgr or layers[1] == .altgr) {
+        altgr_odk_layer = .empty;
+        altgr_odk_layer_shift = .empty;
+        altgr_odk_layer_type = .altgr;
+    } else if (layers[0] == .odk or layers[1] == .odk) {
+        altgr_odk_layer = .empty;
+        altgr_odk_layer_shift = .empty;
+        altgr_odk_layer_type = .odk;
     }
-}
 
-/// Extract a keyboard layout
-/// Caller is responsible of freeing memory
-/// Inner character memory is bound to the layout parameter
-fn parseLayout(
-    allocator: std.mem.Allocator,
-    expected_geometry: Geometry,
-    layout: []const u8,
-    options: ParseOptions,
-) !std.AutoHashMapUnmanaged(KeyCode, ParsedKey) {
-    const graph = try Graphemes.init(allocator);
-    defer graph.deinit(allocator);
+    const rows = keyboard_layout.geometry.getKeys();
+    const template = keyboard_layout.geometry.getTemplate();
 
-    const template = expected_geometry.getTemplate();
-    const keys = expected_geometry.getKeys();
-
-    var keymap = std.AutoHashMapUnmanaged(KeyCode, ParsedKey).empty;
-    errdefer keymap.deinit(allocator);
-
-    for (keys) |row| {
-        for (row.keys) |key| {
-            try keymap.put(allocator, key, ParsedKey{});
-        }
-    }
+    var rows_idx: usize = 0;
+    var rows_keys_idx: usize = 0;
+    var in_line_row: usize = 0;
+    var in_line_column: usize = 0;
+    var in_key_column: usize = 0;
+    var layout_to_parse_line: usize = 1;
+    var layout_to_parse_column: usize = 1;
+    var dead_key_in_parsing = false;
 
     var template_iter = graph.iterator(template);
-    var layout_iter = graph.iterator(layout);
+    var layout_to_parse_iter = graph.iterator(layout_to_parse);
 
-    var line: usize = 1;
-    var column: usize = 1;
-
-    // Skip the first line return
-    if (layout_iter.next()) |lc| {
-        if (!std.mem.eql(u8, "\n", lc.bytes(layout))) {
-            return options.setParsingError(ParsingError.WrongStructure, line, column, "\n", lc.bytes(layout));
-        }
-    }
-
-    while (template_iter.next()) |tc| : (column += 1) {
-        if (layout_iter.next()) |lc| {
-            const template_char = tc.bytes(template);
-            const layout_char = lc.bytes(layout);
-
-            // Empty template and parsed template should have same structure
-            if (!std.mem.eql(u8, template_char, " ")) {
-                if (!std.mem.eql(u8, template_char, layout_char)) {
-                    return options.setParsingError(ParsingError.WrongStructure, line, column, template_char, layout_char);
-                }
-
-                if (std.mem.eql(u8, template_char, "\n")) {
-                    line += 1;
-                    column = 0; // 0 not 1 because autoincrement at the end of iteration
-                }
-                continue;
-            }
-
-            const is_char_in_layout = !std.mem.eql(u8, layout_char, " ");
-
-            const key_row = (line - 1) / nb_lines_per_key;
-            if (key_row >= keys.len) {
-                if (is_char_in_layout) {
-                    // No layout char outside key rows
-                    return options.setParsingError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char);
-                } else {
-                    continue;
-                }
-            }
-
-            const offset = keys[key_row].offset;
-            if (column <= offset) {
-                if (is_char_in_layout) {
-                    // No layout char in the offset
-                    return options.setParsingError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char);
-                } else {
-                    continue;
-                }
-            }
-
-            const key_column = (column - offset) / nb_columns_per_key;
-            if (key_column >= keys[key_row].keys.len) {
-                if (is_char_in_layout) {
-                    // No layout char outside keys
-                    return options.setParsingError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char);
-                } else {
-                    continue;
-                }
-            }
-
-            const in_key_column = @mod((column - offset), nb_columns_per_key);
-            if (in_key_column == 5) {
-                if (is_char_in_layout) {
-                    // No layout char in the 5th column of a key
-                    return options.setParsingError(ParsingError.CharAtBadPlace, line, column, "nothing", layout_char);
-                } else {
-                    continue;
-                }
-            }
-
-            if ((in_key_column == 1 or in_key_column == 3) and
-                !std.mem.eql(u8, layout_char, "*"))
-            {
-                if (is_char_in_layout) {
-                    // No other char than dead key in these columns
-                    return options.setParsingError(ParsingError.CharAtBadPlace, line, column, "nothing or *", layout_char);
-                } else {
-                    continue;
-                }
-            }
-
-            const key_code = keys[key_row].keys[key_column];
-            var key = keymap.getPtr(key_code).?;
-
-            const in_key_row = @mod((line - 1), nb_lines_per_key);
-            if (in_key_row == 1) {
-                // Shifted char
-                try putKeyInKeymap(
-                    &key.left_up,
-                    &key.right_up,
-                    layout_char,
-                    is_char_in_layout,
-                    layout,
-                    lc,
-                    line,
-                    column,
-                    in_key_column,
-                    options,
-                );
-            } else {
-                // Non-shifted char
-                try putKeyInKeymap(
-                    &key.left_down,
-                    &key.right_down,
-                    layout_char,
-                    is_char_in_layout,
-                    layout,
-                    lc,
-                    line,
-                    column,
-                    in_key_column,
-                    options,
-                );
-            }
-        } else {
-            // Template has characters but not the layout
-            return options.setParsingError(ParsingError.WrongStructure, line, column, tc.bytes(template), "nothing");
-        }
-    }
-
-    // Skip the last line return
-    if (layout_iter.next()) |lc| {
-        if (!std.mem.eql(u8, "\n", lc.bytes(layout))) {
-            return options.setParsingError(ParsingError.WrongStructure, line, column, "\n", lc.bytes(layout));
-        }
-        line += 1;
-        column = 1;
-    } else {
-        return options.setParsingError(ParsingError.WrongStructure, line, column, "\n", "nothing");
-    }
-
-    if (layout_iter.next()) |lc| {
-        // Layout has characters but not the template
-        return options.setParsingError(ParsingError.WrongStructure, line, column, "nothing", lc.bytes(layout));
-    }
-
-    return keymap;
-}
-
-fn putKeyInKeymap(
-    key_left: *?[]const u8,
-    key_right: *?[]const u8,
-    layout_char: []const u8,
-    is_char_in_layout: bool,
-    layout: []const u8,
-    lc: Grapheme,
-    line: usize,
-    column: usize,
-    in_key_column: usize,
-    options: ParseOptions,
-) ParsingError!void {
-    switch (in_key_column) {
-        1 => putKey(key_left, layout_char, is_char_in_layout),
-        2 => try putKeyOrDeadKey(
-            key_left,
-            layout_char,
-            is_char_in_layout,
-            layout,
-            lc,
-            line,
-            column,
-            options,
-        ),
-        3 => putKey(key_right, layout_char, is_char_in_layout),
-        4 => try putKeyOrDeadKey(
-            key_right,
-            layout_char,
-            is_char_in_layout,
-            layout,
-            lc,
-            line,
-            column,
-            options,
-        ),
-        else => unreachable,
-    }
-}
-
-fn putKey(key: *?[]const u8, layout_char: []const u8, is_char_in_layout: bool) void {
-    if (is_char_in_layout) {
-        key.* = layout_char;
-    }
-}
-
-fn putKeyOrDeadKey(
-    key: *?[]const u8,
-    layout_char: []const u8,
-    is_char_in_layout: bool,
-    layout: []const u8,
-    lc: Grapheme,
-    line: usize,
-    column: usize,
-    options: ParseOptions,
-) ParsingError!void {
-    if (key.*) |_| {
-        if (is_char_in_layout) {
-            // Dead key '*' to keep before layout char
-            key.* = layout[(lc.offset - 1)..][0..(lc.len + 1)];
-            // TODO: do we check here that it is a valid dead key?
-            // TODO: kalamine/layout.py:311
-        } else {
-            // Dead key followed by a space
+    // Skip the first empty line
+    if (layout_to_parse_iter.next()) |ltpc| {
+        if (!std.mem.eql(u8, "\n", ltpc.bytes(layout_to_parse))) {
             return options.setParsingError(
-                ParsingError.CharAtBadPlace,
-                line,
-                column,
-                "second half of a dead key",
-                layout_char,
+                ParsingError.WrongStructure,
+                layout_to_parse_line,
+                layout_to_parse_column,
+                "\n",
+                ltpc.bytes(layout_to_parse),
             );
         }
+    }
+
+    while (template_iter.next()) |tc| {
+        if (layout_to_parse_iter.next()) |ltpc| {
+            const template_char = tc.bytes(template);
+            const layout_char = ltpc.bytes(layout_to_parse);
+
+            if (rows_idx >= rows.len or // Template last lines
+                in_line_row == 0 or // Template first line
+                in_line_column < rows[rows_idx].offset or // Row offset
+                rows_keys_idx >= rows[rows_idx].keys.len or // End of line
+                (in_key_column == 4 or in_key_column == 5) // Key separation
+            ) {
+                // Template and layout to parse should have same structure
+                if (!std.mem.eql(u8, template_char, layout_char)) {
+                    return options.setParsingError(
+                        ParsingError.WrongStructure,
+                        layout_to_parse_line,
+                        layout_to_parse_column,
+                        template_char,
+                        layout_char,
+                    );
+                }
+            } else {
+                const is_char_in_layout = !std.mem.eql(u8, layout_char, " ");
+
+                if (in_key_column == 0 or in_key_column == 2) {
+                    if (is_char_in_layout) {
+                        if (std.mem.eql(u8, layout_char, "*")) {
+                            dead_key_in_parsing = true;
+                        } else {
+                            // No other char than dead key in these columns
+                            return options.setParsingError(
+                                ParsingError.CharAtBadPlace,
+                                layout_to_parse_line,
+                                layout_to_parse_column,
+                                "nothing or *",
+                                layout_char,
+                            );
+                        }
+                    }
+                } else if (in_key_column == 1 or in_key_column == 3) {
+                    if (is_char_in_layout) {
+                        var layer_no_shift: *std.AutoHashMapUnmanaged(KeyCode, []const u8) = undefined;
+                        var layer_shift: *std.AutoHashMapUnmanaged(KeyCode, []const u8) = undefined;
+
+                        if (in_key_column == 1) {
+                            // Append base key if any
+                            if (base_layer == null) {
+                                // Has char in first column but no base layer
+                                return options.setParsingError(
+                                    ParsingError.CharAtBadPlace,
+                                    layout_to_parse_line,
+                                    layout_to_parse_column,
+                                    " ",
+                                    layout_char,
+                                );
+                            }
+
+                            layer_no_shift = &base_layer.?;
+                            layer_shift = &base_layer_shift.?;
+                        } else if (in_key_column == 3) {
+                            // Append altgr or 1dk key if any
+                            if (altgr_odk_layer == null) {
+                                // Has char in third column but no altgr/1dk layer
+                                return options.setParsingError(
+                                    ParsingError.CharAtBadPlace,
+                                    layout_to_parse_line,
+                                    layout_to_parse_column,
+                                    " ",
+                                    layout_char,
+                                );
+                            }
+
+                            layer_no_shift = &altgr_odk_layer.?;
+                            layer_shift = &altgr_odk_layer_shift.?;
+                        }
+
+                        var key_to_add = std.ArrayList(u8).empty;
+
+                        if (dead_key_in_parsing) {
+                            // Dead key '*' to keep before layout char
+                            dead_key_in_parsing = false;
+                            try key_to_add.append(arena, '*');
+                            // TODO: do we check here that it is a valid dead key? kalamine/layout.py:311
+                        }
+
+                        try key_to_add.appendSlice(arena, layout_char);
+                        const key_value = try key_to_add.toOwnedSlice(arena);
+
+                        const key = rows[rows_idx].keys[rows_keys_idx];
+
+                        if (in_line_row == 1) {
+                            // Shifted char
+                            try layer_shift.put(arena, key, key_value);
+                        } else {
+                            // Non-shifted char
+                            try layer_no_shift.put(arena, key, key_value);
+                        }
+                    } else if (dead_key_in_parsing) {
+                        // Missing second half of dead key
+                        return options.setParsingError(
+                            ParsingError.CharAtBadPlace,
+                            layout_to_parse_line,
+                            layout_to_parse_column,
+                            "second half of a dead key",
+                            layout_char,
+                        );
+                    }
+                }
+            }
+
+            // Set the counters
+            if (std.mem.eql(u8, template_char, "\n")) {
+                if (in_line_row >= nb_lines_per_key - 1) {
+                    in_line_row = 0;
+                    rows_idx += 1;
+                } else {
+                    in_line_row += 1;
+                }
+
+                rows_keys_idx = 0;
+                in_line_column = 0;
+                in_key_column = 0;
+                layout_to_parse_line += 1;
+                layout_to_parse_column = 1;
+            } else {
+                if (in_key_column >= nb_columns_per_key - 1) {
+                    in_key_column = 0;
+                    rows_keys_idx += 1;
+                } else if (rows_idx < rows.len and
+                    in_line_column >= rows[rows_idx].offset)
+                {
+                    // Skip offset, not a key
+                    in_key_column += 1;
+                }
+
+                in_line_column += 1;
+                layout_to_parse_column += 1;
+            }
+        } else {
+            // Template has characters but not the layout to parse
+            return options.setParsingError(
+                ParsingError.WrongStructure,
+                layout_to_parse_line,
+                layout_to_parse_column,
+                tc.bytes(template),
+                "nothing",
+            );
+        }
+    }
+
+    // Skip the last empty line
+    if (layout_to_parse_iter.next()) |ltpc| {
+        if (!std.mem.eql(u8, "\n", ltpc.bytes(layout_to_parse))) {
+            return options.setParsingError(
+                ParsingError.WrongStructure,
+                layout_to_parse_line,
+                layout_to_parse_column,
+                "\n",
+                ltpc.bytes(layout_to_parse),
+            );
+        }
+        layout_to_parse_line += 1;
+        layout_to_parse_column = 1;
     } else {
-        putKey(key, layout_char, is_char_in_layout);
+        return options.setParsingError(
+            ParsingError.WrongStructure,
+            layout_to_parse_line,
+            layout_to_parse_column,
+            "\n",
+            "nothing",
+        );
+    }
+
+    if (layout_to_parse_iter.next()) |ltpc| {
+        // Layout to parse has characters but not the template
+        return options.setParsingError(
+            ParsingError.WrongStructure,
+            layout_to_parse_line,
+            layout_to_parse_column,
+            "nothing",
+            ltpc.bytes(layout_to_parse),
+        );
+    }
+
+    // Add non-shifted value to base layer
+    if (base_layer_shift) |layer_shift| {
+        var it = layer_shift.iterator();
+        while (it.next()) |entry| {
+            const key_code = entry.key_ptr;
+            const key_value = entry.value_ptr;
+            if (!base_layer.?.contains(key_code.*)) {
+                const key_to_put_base = try case.toLowerStr(arena, key_value.*);
+                try base_layer.?.put(arena, key_code.*, key_to_put_base);
+            }
+        }
+    }
+
+    // Add shifted value to altgr/1dk layer
+    if (altgr_odk_layer) |layer_no_shift| {
+        var it = layer_no_shift.iterator();
+        while (it.next()) |entry| {
+            const key_code = entry.key_ptr;
+            const key_value = entry.value_ptr;
+            if (!altgr_odk_layer_shift.?.contains(key_code.*)) {
+                const key_to_put_shift = try case.toUpperStr(arena, key_value.*);
+                try altgr_odk_layer_shift.?.put(arena, key_code.*, key_to_put_shift);
+            }
+        }
+    }
+
+    // Add base layer to keyboard layout if any
+    if (base_layer != null) {
+        try keyboard_layout.layers.put(arena, .base, base_layer.?);
+        try keyboard_layout.layers.put(arena, .shift, base_layer_shift.?);
+    }
+
+    // Add altgr/1dk layer to keyboard layout if any
+    if (altgr_odk_layer_type == .altgr and
+        (altgr_odk_layer.?.size != 0 or altgr_odk_layer_shift.?.size != 0))
+    {
+        keyboard_layout.has_altgr = true;
+        try keyboard_layout.layers.put(arena, .altgr, altgr_odk_layer.?);
+        try keyboard_layout.layers.put(arena, .altgr_shift, altgr_odk_layer_shift.?);
+    } else if (altgr_odk_layer_type == .odk and
+        (altgr_odk_layer.?.size != 0 or altgr_odk_layer_shift.?.size != 0))
+    {
+        keyboard_layout.has_odk = true;
+        try keyboard_layout.layers.put(arena, .odk, altgr_odk_layer.?);
+        try keyboard_layout.layers.put(arena, .odk_shift, altgr_odk_layer_shift.?);
     }
 }
 
@@ -673,7 +676,7 @@ test "parseKeyboardLayoutFromToml with 1dk and altgr" {
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
     try std.testing.expect(result.has_altgr);
-    try std.testing.expect(result.has_1dk);
+    try std.testing.expect(result.has_odk);
 
     try std.testing.expectEqual(6, result.layers.size);
 
@@ -978,9 +981,9 @@ test "parseKeyboardLayoutFromToml with 1dk" {
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
     try std.testing.expect(!result.has_altgr);
-    try std.testing.expect(result.has_1dk);
+    try std.testing.expect(result.has_odk);
 
-    try std.testing.expectEqual(6, result.layers.size);
+    try std.testing.expectEqual(4, result.layers.size);
 
     const expected_base_layer = [_]struct { KeyCode, []const u8 }{
         .{ .tlde, "`" },
@@ -1143,14 +1146,6 @@ test "parseKeyboardLayoutFromToml with 1dk" {
     };
 
     try testAssertLayer(result.layers.get(.odk_shift).?, &expected_odk_shift_layer);
-
-    const expected_altgr_layer = [_]struct { KeyCode, []const u8 }{};
-
-    try testAssertLayer(result.layers.get(.altgr).?, &expected_altgr_layer);
-
-    const expected_altgr_shift_layer = [_]struct { KeyCode, []const u8 }{};
-
-    try testAssertLayer(result.layers.get(.altgr_shift).?, &expected_altgr_shift_layer);
 }
 
 test "parseKeyboardLayoutFromToml with altgr separate from base" {
@@ -1220,9 +1215,9 @@ test "parseKeyboardLayoutFromToml with altgr separate from base" {
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
     try std.testing.expect(result.has_altgr);
-    try std.testing.expect(!result.has_1dk);
+    try std.testing.expect(!result.has_odk);
 
-    try std.testing.expectEqual(6, result.layers.size);
+    try std.testing.expectEqual(4, result.layers.size);
 
     const expected_base_layer = [_]struct { KeyCode, []const u8 }{
         .{ .tlde, "`" },
@@ -1337,14 +1332,6 @@ test "parseKeyboardLayoutFromToml with altgr separate from base" {
     };
 
     try testAssertLayer(result.layers.get(.shift).?, &expected_shift_layer);
-
-    const expected_odk_layer = [_]struct { KeyCode, []const u8 }{};
-
-    try testAssertLayer(result.layers.get(.odk).?, &expected_odk_layer);
-
-    const expected_odk_shift_layer = [_]struct { KeyCode, []const u8 }{};
-
-    try testAssertLayer(result.layers.get(.odk_shift).?, &expected_odk_shift_layer);
 
     const expected_altgr_layer = [_]struct { KeyCode, []const u8 }{
         .{ .tlde, "*`" },
@@ -1481,9 +1468,9 @@ test "parseKeyboardLayoutFromToml with altgr on base" {
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
     try std.testing.expect(result.has_altgr);
-    try std.testing.expect(!result.has_1dk);
+    try std.testing.expect(!result.has_odk);
 
-    try std.testing.expectEqual(6, result.layers.size);
+    try std.testing.expectEqual(4, result.layers.size);
 
     const expected_base_layer = [_]struct { KeyCode, []const u8 }{
         .{ .tlde, "`" },
@@ -1598,14 +1585,6 @@ test "parseKeyboardLayoutFromToml with altgr on base" {
     };
 
     try testAssertLayer(result.layers.get(.shift).?, &expected_shift_layer);
-
-    const expected_odk_layer = [_]struct { KeyCode, []const u8 }{};
-
-    try testAssertLayer(result.layers.get(.odk).?, &expected_odk_layer);
-
-    const expected_odk_shift_layer = [_]struct { KeyCode, []const u8 }{};
-
-    try testAssertLayer(result.layers.get(.odk_shift).?, &expected_odk_shift_layer);
 
     const expected_altgr_layer = [_]struct { KeyCode, []const u8 }{
         .{ .tlde, "*`" },
@@ -1742,9 +1721,9 @@ test "parseKeyboardLayoutFromToml with base only" {
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
     try std.testing.expect(!result.has_altgr);
-    try std.testing.expect(!result.has_1dk);
+    try std.testing.expect(!result.has_odk);
 
-    try std.testing.expectEqual(6, result.layers.size);
+    try std.testing.expectEqual(2, result.layers.size);
 
     const expected_base_layer = [_]struct { KeyCode, []const u8 }{
         .{ .tlde, "`" },
@@ -1859,202 +1838,13 @@ test "parseKeyboardLayoutFromToml with base only" {
     };
 
     try testAssertLayer(result.layers.get(.shift).?, &expected_shift_layer);
-
-    const expected_odk_layer = [_]struct { KeyCode, []const u8 }{};
-
-    try testAssertLayer(result.layers.get(.odk).?, &expected_odk_layer);
-
-    const expected_odk_shift_layer = [_]struct { KeyCode, []const u8 }{};
-
-    try testAssertLayer(result.layers.get(.odk_shift).?, &expected_odk_shift_layer);
-
-    const expected_altgr_layer = [_]struct { KeyCode, []const u8 }{};
-
-    try testAssertLayer(result.layers.get(.altgr).?, &expected_altgr_layer);
-
-    const expected_altgr_shift_layer = [_]struct { KeyCode, []const u8 }{};
-
-    try testAssertLayer(result.layers.get(.altgr_shift).?, &expected_altgr_shift_layer);
 }
 
-test "parseLayout full layout" {
-    const layout =
-        \\
-        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
-        \\│ ~   │ !   │ @   │ #   │ $   │ %   │ ^   │ &   │ *   │ (   │ )   │ _   │ +   ┃          ┃
-        \\│ `   │ 1   │ 2 « │ 3 » │ 4   │ 5 € │ 6   │ 7   │ 8   │ 9   │ 0   │ -   │ =   ┃ ⌫        ┃
-        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┳━━━━━━━┫
-        \\┃        ┃ Q   │ W   │ E   │ R   │ T   │ Y   │ U   │ I   │ O   │ P   │ {   │ }   ┃       ┃
-        \\┃ ↹      ┃     │     │   é │     │     │   ý │   ú │   í │   ó │     │ [   │ ]   ┃       ┃
-        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┺┓  ⏎   ┃
-        \\┃         ┃ A   │ S   │ D   │ F   │ G   │ H   │ J   │ K   │ L   │ :   │*¨*~ │ |   ┃      ┃
-        \\┃ ⇬       ┃   á │     │     │     │     │     │     │     │     │ ;   │***´ │ \   ┃      ┃
-        \\┣━━━━━━┳━━┹──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┷━━━━━┻━━━━━━┫
-        \\┃      ┃ |   │ Z   │ X   │ C   │ V   │ B   │ N   │ M   │ < • │ >   │ ?   ┃               ┃
-        \\┃ ⇧    ┃ \   │     │     │   ç │     │     │     │   µ │ , · │ . … │ /   ┃ ⇧             ┃
-        \\┣━━━━━━┻┳━━━━┷━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
-        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
-        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
-        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
-        \\
-    ;
-
-    var result = try parseLayout(std.testing.allocator, Geometry.ISO, layout, .{});
-    defer result.deinit(std.testing.allocator);
-
-    try std.testing.expectEqual(48, result.size);
-
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "~", .left_down = "`" }, result.get(.tlde));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "!", .left_down = "1" }, result.get(.ae01));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "@", .left_down = "2", .right_down = "«" }, result.get(.ae02));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "#", .left_down = "3", .right_down = "»" }, result.get(.ae03));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "$", .left_down = "4" }, result.get(.ae04));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "%", .left_down = "5", .right_down = "€" }, result.get(.ae05));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "^", .left_down = "6" }, result.get(.ae06));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "&", .left_down = "7" }, result.get(.ae07));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "*", .left_down = "8" }, result.get(.ae08));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "(", .left_down = "9" }, result.get(.ae09));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = ")", .left_down = "0" }, result.get(.ae10));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "_", .left_down = "-" }, result.get(.ae11));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "+", .left_down = "=" }, result.get(.ae12));
-
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "Q" }, result.get(.ad01));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "W" }, result.get(.ad02));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "E", .right_down = "é" }, result.get(.ad03));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "R" }, result.get(.ad04));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "T" }, result.get(.ad05));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "Y", .right_down = "ý" }, result.get(.ad06));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "U", .right_down = "ú" }, result.get(.ad07));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "I", .right_down = "í" }, result.get(.ad08));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "O", .right_down = "ó" }, result.get(.ad09));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "P" }, result.get(.ad10));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "{", .left_down = "[" }, result.get(.ad11));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "}", .left_down = "]" }, result.get(.ad12));
-
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "A", .right_down = "á" }, result.get(.ac01));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "S" }, result.get(.ac02));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "D" }, result.get(.ac03));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "F" }, result.get(.ac04));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "G" }, result.get(.ac05));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "H" }, result.get(.ac06));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "J" }, result.get(.ac07));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "K" }, result.get(.ac08));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "L" }, result.get(.ac09));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = ":", .left_down = ";" }, result.get(.ac10));
-    try std.testing.expectEqualDeep(ParsedKey{
-        .left_up = "*¨",
-        .left_down = "**",
-        .right_up = "*~",
-        .right_down = "*´",
-    }, result.get(.ac11));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "|", .left_down = "\\" }, result.get(.bksl));
-
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "|", .left_down = "\\" }, result.get(.lsgt));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "Z" }, result.get(.ab01));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "X" }, result.get(.ab02));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "C", .right_down = "ç" }, result.get(.ab03));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "V" }, result.get(.ab04));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "B" }, result.get(.ab05));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "N" }, result.get(.ab06));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "M", .right_down = "µ" }, result.get(.ab07));
-    try std.testing.expectEqualDeep(ParsedKey{
-        .left_up = "<",
-        .left_down = ",",
-        .right_up = "•",
-        .right_down = "·",
-    }, result.get(.ab08));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = ">", .left_down = ".", .right_down = "…" }, result.get(.ab09));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "?", .left_down = "/" }, result.get(.ab10));
-}
-
-test "parseLayout half-full layout" {
-    const layout =
-        \\
-        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
-        \\│ A B │ C   │ E   │     │   G │     │     │ I   │ J   │ K   │ L   │ M   │ N   ┃          ┃
-        \\│ a b │   d │     │ f   │     │   h │     │     │     │     │     │     │     ┃ ⌫        ┃
-        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┳━━━━━━━┫
-        \\┃        ┃ O   │     │     │     │     │     │     │     │     │     │     │   P ┃       ┃
-        \\┃ ↹      ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
-        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┺┓  ⏎   ┃
-        \\┃         ┃ Q   │     │     │     │     │     │     │     │     │     │     │   R ┃      ┃
-        \\┃ ⇬       ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
-        \\┣━━━━━━┳━━┹──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┷━━━━━┻━━━━━━┫
-        \\┃      ┃ S   │     │     │     │     │     │     │     │     │     │     ┃               ┃
-        \\┃ ⇧    ┃     │     │     │     │     │     │     │     │     │     │   t ┃ ⇧             ┃
-        \\┣━━━━━━┻┳━━━━┷━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
-        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
-        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
-        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
-        \\
-    ;
-
-    var result = try parseLayout(std.testing.allocator, Geometry.ISO, layout, .{});
-    defer result.deinit(std.testing.allocator);
-
-    try std.testing.expectEqual(48, result.size);
-
-    try std.testing.expectEqualDeep(ParsedKey{
-        .left_up = "A",
-        .left_down = "a",
-        .right_up = "B",
-        .right_down = "b",
-    }, result.get(.tlde));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "C", .right_down = "d" }, result.get(.ae01));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "E" }, result.get(.ae02));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_down = "f" }, result.get(.ae03));
-    try std.testing.expectEqualDeep(ParsedKey{ .right_up = "G" }, result.get(.ae04));
-    try std.testing.expectEqualDeep(ParsedKey{ .right_down = "h" }, result.get(.ae05));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ae06));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "I" }, result.get(.ae07));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "J" }, result.get(.ae08));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "K" }, result.get(.ae09));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "L" }, result.get(.ae10));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "M" }, result.get(.ae11));
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "N" }, result.get(.ae12));
-
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "O" }, result.get(.ad01));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad02));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad03));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad04));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad05));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad06));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad07));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad08));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad09));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad10));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad11));
-    try std.testing.expectEqualDeep(ParsedKey{ .right_up = "P" }, result.get(.ad12));
-
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "Q" }, result.get(.ac01));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac02));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac03));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac04));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac05));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac06));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac07));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac08));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac09));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac10));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac11));
-    try std.testing.expectEqualDeep(ParsedKey{ .right_up = "R" }, result.get(.bksl));
-
-    try std.testing.expectEqualDeep(ParsedKey{ .left_up = "S" }, result.get(.lsgt));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab01));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab02));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab03));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab04));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab05));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab06));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab07));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab08));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab09));
-    try std.testing.expectEqualDeep(ParsedKey{ .right_down = "t" }, result.get(.ab10));
-}
-
-test "parseLayout empty layout" {
-    const layout =
-        \\
+test "parseKeyboardLayoutFromToml with empty base" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
@@ -2071,70 +1861,46 @@ test "parseLayout empty layout" {
         \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
         \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
         \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
         \\
     ;
+    var reader = std.Io.Reader.fixed(toml_to_parse);
 
-    var result = try parseLayout(std.testing.allocator, Geometry.ISO, layout, .{});
-    defer result.deinit(std.testing.allocator);
+    var result = try parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{});
+    defer result.deinit();
 
-    try std.testing.expectEqual(48, result.size);
+    try std.testing.expectEqualStrings("test", result.name);
+    try std.testing.expectEqualStrings("test", result.name8);
+    try expectEqualOptionalString(null, result.locale);
+    try expectEqualOptionalString(null, result.variant);
+    try expectEqualOptionalString(null, result.author);
+    try expectEqualOptionalString(null, result.description);
+    try expectEqualOptionalString(null, result.url);
+    try expectEqualOptionalString(null, result.version);
+    try std.testing.expectEqual(Geometry.ISO, result.geometry);
+    try std.testing.expect(!result.has_altgr);
+    try std.testing.expect(!result.has_odk);
 
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.tlde));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ae01));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ae02));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ae03));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ae04));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ae05));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ae06));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ae07));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ae08));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ae09));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ae10));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ae11));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ae12));
+    try std.testing.expectEqual(2, result.layers.size);
 
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad01));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad02));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad03));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad04));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad05));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad06));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad07));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad08));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad09));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad10));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad11));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ad12));
+    const expected_base_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .spce, " " },
+    };
 
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac01));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac02));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac03));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac04));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac05));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac06));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac07));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac08));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac09));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac10));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ac11));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.bksl));
+    try testAssertLayer(result.layers.get(.base).?, &expected_base_layer);
 
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.lsgt));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab01));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab02));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab03));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab04));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab05));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab06));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab07));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab08));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab09));
-    try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab10));
+    const expected_shift_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.shift).?, &expected_shift_layer);
 }
 
-test "parseLayout no first line return" {
-    const layout =
-        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+test "parseKeyboardLayoutFromToml no first line return" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
         \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┳━━━━━━━┫
@@ -2150,24 +1916,28 @@ test "parseLayout no first line return" {
         \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
         \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
         \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
         \\
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(1, diag.line);
     try std.testing.expectEqual(1, diag.column);
     try expectEqualOptionalString("a line return", diag.expected);
     try expectEqualOptionalString("┌", diag.found);
 }
 
-test "parseLayout no last line return" {
-    const layout =
-        \\
+test "parseKeyboardLayoutFromToml no last line return" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
@@ -2183,61 +1953,73 @@ test "parseLayout no last line return" {
         \\┣━━━━━━┻┳━━━━┷━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
         \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
         \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
-        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛'''
+        \\
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(16, diag.line);
     try std.testing.expectEqual(91, diag.column);
     try expectEqualOptionalString("a line return", diag.expected);
     try expectEqualOptionalString("nothing", diag.found);
 }
 
-test "parseLayout truncated layout" {
-    const layout =
-        \\
+test "parseKeyboardLayoutFromToml truncated layout" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\'''
         \\
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(2, diag.line);
     try std.testing.expectEqual(1, diag.column);
     try expectEqualOptionalString("│", diag.expected);
     try expectEqualOptionalString("nothing", diag.found);
 }
 
-test "parseLayout truncated layout line return" {
-    const layout =
+test "parseKeyboardLayoutFromToml truncated layout line return" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓'''
         \\
-        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(1, diag.line);
     try std.testing.expectEqual(91, diag.column);
     try expectEqualOptionalString("a line return", diag.expected);
     try expectEqualOptionalString("nothing", diag.found);
 }
 
-test "parseLayout too many char" {
-    const layout =
-        \\
+test "parseKeyboardLayoutFromToml too many char" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
@@ -2254,24 +2036,28 @@ test "parseLayout too many char" {
         \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
         \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
         \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
-        \\a
+        \\a'''
+        \\
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(17, diag.line);
     try std.testing.expectEqual(1, diag.column);
     try expectEqualOptionalString("nothing", diag.expected);
     try expectEqualOptionalString("a", diag.found);
 }
 
-test "parseLayout too many line returns" {
-    const layout =
-        \\
+test "parseKeyboardLayoutFromToml too many line returns" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
@@ -2289,24 +2075,28 @@ test "parseLayout too many line returns" {
         \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
         \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
         \\
+        \\'''
         \\
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(17, diag.line);
     try std.testing.expectEqual(1, diag.column);
     try expectEqualOptionalString("nothing", diag.expected);
     try expectEqualOptionalString("a line return", diag.found);
 }
 
-test "parseLayout wrong indentation with spaces" {
-    const layout =
-        \\
+test "parseKeyboardLayoutFromToml wrong indentation with spaces" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
         \\  ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
         \\  │     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
         \\  │     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
@@ -2323,39 +2113,46 @@ test "parseLayout wrong indentation with spaces" {
         \\  ┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
         \\  ┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
         \\  ┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
         \\
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(1, diag.line);
     try std.testing.expectEqual(1, diag.column);
     try expectEqualOptionalString("┌", diag.expected);
     try expectEqualOptionalString("a space", diag.found);
 }
 
-test "parseLayout wrong indentation with tab" {
-    const layout = "\n\t┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓";
+test "parseKeyboardLayoutFromToml wrong indentation with tab" {
+    // Cannot put tab in multiline string
+    const toml_to_parse = "name = \"test\"\ngeometry = \"ISO\"\nbase = '''\n\t┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓\n'''\n";
 
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.WrongStructure, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(1, diag.line);
     try std.testing.expectEqual(1, diag.column);
     try expectEqualOptionalString("┌", diag.expected);
     try expectEqualOptionalString("a tabulation", diag.found);
 }
 
-test "parseLayout should not have char in offset" {
-    const layout =
-        \\
+test "parseKeyboardLayoutFromToml should not have char in offset" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
@@ -2372,24 +2169,28 @@ test "parseLayout should not have char in offset" {
         \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
         \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
         \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
         \\
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
-    try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
+    try std.testing.expectEqual(ParsingError.WrongStructure, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(6, diag.line);
     try std.testing.expectEqual(7, diag.column);
-    try expectEqualOptionalString("nothing", diag.expected);
+    try expectEqualOptionalString("a space", diag.expected);
     try expectEqualOptionalString("a", diag.found);
 }
 
-test "parseLayout should not have char after keys" {
-    const layout =
-        \\
+test "parseKeyboardLayoutFromToml should not have char after keys" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
@@ -2406,24 +2207,28 @@ test "parseLayout should not have char after keys" {
         \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
         \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
         \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
         \\
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
-    try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
+    try std.testing.expectEqual(ParsingError.WrongStructure, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(6, diag.line);
     try std.testing.expectEqual(86, diag.column);
-    try expectEqualOptionalString("nothing", diag.expected);
+    try expectEqualOptionalString("a space", diag.expected);
     try expectEqualOptionalString("a", diag.found);
 }
 
-test "parseLayout should not have char in last line" {
-    const layout =
-        \\
+test "parseKeyboardLayoutFromToml should not have char in last line" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
@@ -2440,24 +2245,28 @@ test "parseLayout should not have char in last line" {
         \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
         \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣             a                ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
         \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
         \\
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
-    try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
+    try std.testing.expectEqual(ParsingError.WrongStructure, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(15, diag.line);
     try std.testing.expectEqual(41, diag.column);
-    try expectEqualOptionalString("nothing", diag.expected);
+    try expectEqualOptionalString("a space", diag.expected);
     try expectEqualOptionalString("a", diag.found);
 }
 
-test "parseLayout should not have char in last column of a key" {
-    const layout =
-        \\
+test "parseKeyboardLayoutFromToml should not have char in last column of a key" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
         \\│     │     │     │     │     │     │    a│     │     │     │     │     │     ┃ ⌫        ┃
@@ -2474,24 +2283,28 @@ test "parseLayout should not have char in last column of a key" {
         \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
         \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
         \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
         \\
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
-    try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
+    try std.testing.expectEqual(ParsingError.WrongStructure, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(3, diag.line);
     try std.testing.expectEqual(42, diag.column);
-    try expectEqualOptionalString("nothing", diag.expected);
+    try expectEqualOptionalString("a space", diag.expected);
     try expectEqualOptionalString("a", diag.found);
 }
 
-test "parseLayout should not have char in 1st column of a key" {
-    const layout =
-        \\
+test "parseKeyboardLayoutFromToml should not have char in 1st column of a key" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
@@ -2508,24 +2321,28 @@ test "parseLayout should not have char in 1st column of a key" {
         \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
         \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
         \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
         \\
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(5, diag.line);
     try std.testing.expectEqual(41, diag.column);
     try expectEqualOptionalString("nothing or *", diag.expected);
     try expectEqualOptionalString("a", diag.found);
 }
 
-test "parseLayout should not have char in 3rd column of a key" {
-    const layout =
-        \\
+test "parseKeyboardLayoutFromToml should not have char in 3rd column of a key" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\full = '''
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
@@ -2542,24 +2359,28 @@ test "parseLayout should not have char in 3rd column of a key" {
         \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
         \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
         \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
         \\
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
+    try std.testing.expectEqualStrings("full", diag.arg);
     try std.testing.expectEqual(5, diag.line);
     try std.testing.expectEqual(43, diag.column);
     try expectEqualOptionalString("nothing or *", diag.expected);
     try expectEqualOptionalString("a", diag.found);
 }
 
-test "parseLayout empty dead key" {
-    const layout =
-        \\
+test "parseKeyboardLayoutFromToml empty dead key" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
         \\│*    │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
         \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
@@ -2576,17 +2397,114 @@ test "parseLayout empty dead key" {
         \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
         \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
         \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
         \\
     ;
-
+    var reader = std.Io.Reader.fixed(toml_to_parse);
     var diag = Diagnostic{ .allocator = std.testing.allocator };
     defer diag.deinit();
 
-    const result = parseLayout(std.testing.allocator, Geometry.ISO, layout, .{ .diagnostic = &diag });
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
 
     try std.testing.expectEqual(ParsingError.CharAtBadPlace, result);
+    try std.testing.expectEqualStrings("base", diag.arg);
     try std.testing.expectEqual(2, diag.line);
     try std.testing.expectEqual(3, diag.column);
     try expectEqualOptionalString("second half of a dead key", diag.expected);
     try expectEqualOptionalString("a space", diag.found);
+}
+
+test "parseKeyboardLayoutFromToml altgr without a base" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\altgr = '''
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
+        \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┳━━━━━━━┫
+        \\┃        ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
+        \\┃ ↹      ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┺┓  ⏎   ┃
+        \\┃         ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┃ ⇬       ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┣━━━━━━┳━━┹──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┷━━━━━┻━━━━━━┫
+        \\┃      ┃     │     │     │     │     │     │     │     │     │     │     ┃               ┃
+        \\┃ ⇧    ┃     │     │     │     │     │     │     │     │     │     │     ┃ ⇧             ┃
+        \\┣━━━━━━┻┳━━━━┷━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
+        \\
+    ;
+    var reader = std.Io.Reader.fixed(toml_to_parse);
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
+
+    try std.testing.expectEqual(ParsingError.MissingLayout, result);
+    try std.testing.expectEqualStrings("", diag.arg);
+    try std.testing.expectEqual(0, diag.line);
+    try std.testing.expectEqual(0, diag.column);
+    try expectEqualOptionalString(null, diag.expected);
+    try expectEqualOptionalString(null, diag.found);
+}
+
+test "parseKeyboardLayoutFromToml error in altgr" {
+    const toml_to_parse =
+        \\name = "test"
+        \\geometry = "ISO"
+        \\base = '''
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
+        \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┳━━━━━━━┫
+        \\┃        ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
+        \\┃ ↹      ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┺┓  ⏎   ┃
+        \\┃         ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┃ ⇬       ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┣━━━━━━┳━━┹──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┷━━━━━┻━━━━━━┫
+        \\┃      ┃     │     │     │     │     │     │     │     │     │     │     ┃               ┃
+        \\┃ ⇧    ┃     │     │     │     │     │     │     │     │     │     │     ┃ ⇧             ┃
+        \\┣━━━━━━┻┳━━━━┷━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
+        \\
+        \\altgr = '''
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
+        \\│     │     │     │     │     │     │     │     │     │     │     │     │     ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┳━━━━━━━┫
+        \\┃        ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
+        \\┃ ↹      ┃     │     │     │     │     │     │     │     │     │     │     │     ┃       ┃
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┺┓  ⏎   ┃
+        \\┃         ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┃ ⇬       ┃     │     │     │     │     │     │     │     │     │     │     │     ┃      ┃
+        \\┣━━━━━━┳━━┹──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┷━━━━━┻━━━━━━┫
+        \\┃      ┃     │     │     │     │     │     │     │     │     │     │     ┃               ┃
+        \\┃ ⇧    ┃     │     │     │     │     │     │     │     │     │     │     ┃ ⇧             ┃
+        \\┣━━━━━━┻┳━━━━┷━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣             a                ┃ AltGr ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
+        \\
+    ;
+    var reader = std.Io.Reader.fixed(toml_to_parse);
+    var diag = Diagnostic{ .allocator = std.testing.allocator };
+    defer diag.deinit();
+
+    const result = parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{ .diagnostic = &diag });
+
+    try std.testing.expectEqual(ParsingError.WrongStructure, result);
+    try std.testing.expectEqualStrings("altgr", diag.arg);
+    try std.testing.expectEqual(15, diag.line);
+    try std.testing.expectEqual(41, diag.column);
+    try expectEqualOptionalString("a space", diag.expected);
+    try expectEqualOptionalString("a", diag.found);
 }

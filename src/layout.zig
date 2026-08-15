@@ -54,7 +54,7 @@ pub const Layer = enum {
 pub const KeyboardLayout = struct {
     // TODO: kalamine/layout.py:142
 
-    /// Store all values
+    /// Store all values, used for deinit
     arena_allocator: std.heap.ArenaAllocator,
 
     /// Full layout name, displayed in the keyboard settings
@@ -71,9 +71,15 @@ pub const KeyboardLayout = struct {
     url: ?[]const u8,
     version: ?[]const u8,
     geometry: Geometry,
+    /// Base layer is mandatory
+    /// Altgr and 1dk layers are optional
+    /// A layer has always its shifted layer
+    /// If a layer has an non-shifted character, its shifted layer will always contains the
+    /// shifted version and vice-versa
     layers: std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []const u8)),
+    // TODO: see to use layers and maybe function for these bool
     has_altgr: bool = false,
-    has_1dk: bool = false,
+    has_odk: bool = false,
 
     pub fn deinit(self: *KeyboardLayout) void {
         self.arena_allocator.deinit();

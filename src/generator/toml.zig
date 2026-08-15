@@ -61,14 +61,14 @@ fn fillTemplate(
         base_layer = keyboard_layout.layers.get(layers[0]);
         base_layer_shift = keyboard_layout.layers.get(layers[0].shifted());
     } else if ((layers[0] == .altgr and keyboard_layout.has_altgr) or
-        (layers[0] == .odk and keyboard_layout.has_1dk))
+        (layers[0] == .odk and keyboard_layout.has_odk))
     {
         altgr_odk_layer = keyboard_layout.layers.get(layers[0]);
         altgr_odk_layer_shift = keyboard_layout.layers.get(layers[0].shifted());
     }
 
     if ((layers[1] == .altgr and keyboard_layout.has_altgr) or
-        (layers[1] == .odk and keyboard_layout.has_1dk))
+        (layers[1] == .odk and keyboard_layout.has_odk))
     {
         altgr_odk_layer = keyboard_layout.layers.get(layers[1].?);
         altgr_odk_layer_shift = keyboard_layout.layers.get(layers[1].?.shifted());
@@ -85,6 +85,7 @@ fn fillTemplate(
     var in_line_row: usize = 0;
     var in_line_column: usize = 0;
     var in_key_column: usize = 0;
+
     var template_iter = graph.iterator(template);
 
     while (template_iter.next()) |tc| {
@@ -180,6 +181,7 @@ fn fillTemplate(
             }
         }
 
+        // Set the counters
         if (std.mem.eql(u8, template_char, "\n")) {
             if (in_line_row >= nb_lines_per_key - 1) {
                 in_line_row = 0;
@@ -468,7 +470,7 @@ fn testInitKeyboardLayout(arena: *std.heap.ArenaAllocator) !KeyboardLayout {
         .geometry = .ISO,
         .layers = layers,
         .has_altgr = true,
-        .has_1dk = true,
+        .has_odk = true,
     };
 }
 
@@ -509,7 +511,7 @@ test "getBase without 1dk" {
     var keyboard_layout = try testInitKeyboardLayout(&arena);
     defer arena.deinit();
 
-    keyboard_layout.has_1dk = false;
+    keyboard_layout.has_odk = false;
 
     const expected =
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓

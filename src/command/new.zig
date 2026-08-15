@@ -31,8 +31,6 @@ pub fn run(allocator: std.mem.Allocator, options: Options, parse_options: ParseO
     var keyboard_layout = try dummyLayout(allocator, &options, parse_options);
     defer keyboard_layout.deinit();
 
-    std.debug.print("parse\n{any}\n", .{keyboard_layout}); // TODO: delete
-
     try stdout.writeAll(dummy_metadata);
     try stdout.print(dummy_geometry, .{@tagName(options.geometry)});
     keyboard_layout.geometry = options.geometry;

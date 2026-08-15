@@ -74,7 +74,7 @@ pub const Diagnostic = struct {
                 try writer.print(
                     \\kalamine: parse error: wrong structure in layout '{s}', line {d}, column {d}
                     \\Expected: {s} found: {s}
-                    \\See how the layout should be structured with the 'new' command
+                    \\See how the layout should be structured with the 'new' command and check your geometry
                     \\
                 , .{ self.arg, self.line, self.column, self.expected orelse "", self.found orelse "" });
                 try writer.flush();
@@ -82,9 +82,9 @@ pub const Diagnostic = struct {
             },
             ParsingError.CharAtBadPlace => {
                 try writer.print(
-                    \\kalamine: parse error: a character is in the wrong key in layout '{s}', line {d}, column {d}
+                    \\kalamine: parse error: a character is in the wrong place in layout '{s}', line {d}, column {d}
                     \\Expected: {s} found: {s}
-                    \\See how the layout should be structured with the 'new' command
+                    \\See how the layout should be structured with the 'new' command and check your geometry
                     \\
                 , .{ self.arg, self.line, self.column, self.expected orelse "", self.found orelse "" });
                 try writer.flush();
