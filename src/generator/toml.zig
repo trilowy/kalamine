@@ -206,7 +206,7 @@ fn fillTemplate(
     return template_to_fill.toOwnedSlice(allocator);
 }
 
-fn initTestKeyboardLayout(arena: *std.heap.ArenaAllocator) !KeyboardLayout {
+fn testInitKeyboardLayout(arena: *std.heap.ArenaAllocator) !KeyboardLayout {
     const allocator = arena.allocator();
 
     var base_layer = std.AutoHashMapUnmanaged(KeyCode, []const u8).empty;
@@ -474,7 +474,7 @@ fn initTestKeyboardLayout(arena: *std.heap.ArenaAllocator) !KeyboardLayout {
 test "getBase with 1dk" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
 
-    const keyboard_layout = try initTestKeyboardLayout(&arena);
+    const keyboard_layout = try testInitKeyboardLayout(&arena);
     defer arena.deinit();
 
     const expected =
@@ -505,7 +505,7 @@ test "getBase with 1dk" {
 test "getBase without 1dk" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
 
-    var keyboard_layout = try initTestKeyboardLayout(&arena);
+    var keyboard_layout = try testInitKeyboardLayout(&arena);
     defer arena.deinit();
 
     keyboard_layout.has_1dk = false;
@@ -538,7 +538,7 @@ test "getBase without 1dk" {
 test "getFull" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
 
-    var keyboard_layout = try initTestKeyboardLayout(&arena);
+    var keyboard_layout = try testInitKeyboardLayout(&arena);
     defer arena.deinit();
 
     const expected =
@@ -569,7 +569,7 @@ test "getFull" {
 test "getAltgr" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
 
-    var keyboard_layout = try initTestKeyboardLayout(&arena);
+    var keyboard_layout = try testInitKeyboardLayout(&arena);
     defer arena.deinit();
 
     const expected =

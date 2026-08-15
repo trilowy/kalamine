@@ -575,6 +575,1296 @@ fn putKeyOrDeadKey(
     }
 }
 
+const expectEqualOptionalString = @import("../test/util.zig").expectEqualOptionalString;
+
+fn testAssertLayer(
+    layer: std.AutoHashMapUnmanaged(KeyCode, []const u8),
+    expected_keys: []const struct { KeyCode, []const u8 },
+) !void {
+    try std.testing.expectEqual(expected_keys.len, layer.size);
+
+    for (expected_keys) |expected_key| {
+        const expected_key_code, const expected_key_value = expected_key;
+        const key_value = layer.get(expected_key_code);
+        try expectEqualOptionalString(expected_key_value, key_value);
+    }
+}
+
+test "parseKeyboardLayoutFromToml with 1dk and altgr" {
+    const toml_to_parse =
+        \\# kalamine keyboard layout descriptor
+        \\name        = "qwerty-custom"  # full layout name, displayed in the keyboard settings
+        \\name8       = "custom"         # short Windows filename: no spaces, no special chars
+        \\locale      = "us"             # locale/language id
+        \\variant     = "custom-variant" # layout variant id
+        \\author      = "nobody"         # author name
+        \\description = "custom QWERTY layout"
+        \\url         = "https://OneDeadKey.github.com/kalamine"
+        \\version     = "0.0.1"
+        \\geometry    = "ANSI"
+        \\
+        \\base = '''
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│ ~   │ !   │ @   │ #   │ $   │ %   │ ^   │ &   │ *   │ (   │ )   │ _   │ +   ┃          ┃
+        \\│ `   │ 1   │ 2 « │ 3 » │ 4   │ 5 € │ 6   │ 7   │ 8   │ 9   │ 0   │ -   │ =   ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┯━━━━━━━┩
+        \\┃        ┃ Q   │ W   │ E   │ R   │ T   │ Y   │ U   │ I   │ O   │ P   │ {   │ }   │ |     │
+        \\┃ ↹      ┃     │     │   é │     │     │   ý │   ú │   í │   ó │     │ [   │ ]   │ \     │
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┲━━━━┷━━━━━━━┪
+        \\┃         ┃ A   │ S   │ D   │ F   │ G   │ H   │ J   │ K   │ L   │ :   │*¨   ┃            ┃
+        \\┃ ⇬       ┃   á │     │     │     │     │     │     │     │     │ ;   │** ' ┃ ⏎          ┃
+        \\┣━━━━━━━━━┻━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┻━━━━━━━━━━━━┫
+        \\┃            ┃ Z   │ X   │ C   │ V   │ B   │ N   │ M   │ < • │ >   │ ?   ┃               ┃
+        \\┃ ⇧          ┃     │     │   ç │     │     │     │   µ │ , · │ . … │ /   ┃ ⇧             ┃
+        \\┣━━━━━━━┳━━━━┻━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
+        \\
+        \\altgr = '''
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│  *~ │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
+        \\│  *` │     │     │     │     │     │  *^ │     │     │     │     │     │     ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┯━━━━━━━┩
+        \\┃        ┃     │     │     │     │     │     │     │     │     │     │     │     │       │
+        \\┃ ↹      ┃   @ │   < │   > │   $ │   % │   ^ │   & │   * │   ' │   ` │     │     │       │
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┲━━━━┷━━━━━━━┪
+        \\┃         ┃     │     │     │     │     │     │     │     │     │     │  *¨ ┃            ┃
+        \\┃ ⇬       ┃   { │   ( │   ) │   } │   = │   \ │   + │   - │   / │   " │  *´ ┃ ⏎          ┃
+        \\┣━━━━━━━━━┻━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┻━━━━━━━━━━━━┫
+        \\┃            ┃     │     │     │     │     │     │     │     │     │     ┃               ┃
+        \\┃ ⇧          ┃   ~ │   [ │   ] │   _ │   # │   | │   ! │   ; │   : │   ? ┃ ⇧             ┃
+        \\┣━━━━━━━┳━━━━┻━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
+        \\
+        \\[spacebar]
+        \\1dk         = "'"  # apostrophe
+        \\1dk_shift   = "'"  # apostrophe
+        \\
+    ;
+    var reader = std.Io.Reader.fixed(toml_to_parse);
+
+    var result = try parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{});
+    defer result.deinit();
+
+    try std.testing.expectEqualStrings("qwerty-custom", result.name);
+    try std.testing.expectEqualStrings("custom", result.name8);
+    try expectEqualOptionalString("us", result.locale);
+    try expectEqualOptionalString("custom-variant", result.variant);
+    try expectEqualOptionalString("nobody", result.author);
+    try expectEqualOptionalString("custom QWERTY layout", result.description);
+    try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
+    try expectEqualOptionalString("0.0.1", result.version);
+    try std.testing.expectEqual(Geometry.ANSI, result.geometry);
+    try std.testing.expect(result.has_altgr);
+    try std.testing.expect(result.has_1dk);
+
+    try std.testing.expectEqual(6, result.layers.size);
+
+    const expected_base_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "`" },
+        .{ .ae01, "1" },
+        .{ .ae02, "2" },
+        .{ .ae03, "3" },
+        .{ .ae04, "4" },
+        .{ .ae05, "5" },
+        .{ .ae06, "6" },
+        .{ .ae07, "7" },
+        .{ .ae08, "8" },
+        .{ .ae09, "9" },
+        .{ .ae10, "0" },
+        .{ .ae11, "-" },
+        .{ .ae12, "=" },
+
+        .{ .ad01, "q" },
+        .{ .ad02, "w" },
+        .{ .ad03, "e" },
+        .{ .ad04, "r" },
+        .{ .ad05, "t" },
+        .{ .ad06, "y" },
+        .{ .ad07, "u" },
+        .{ .ad08, "i" },
+        .{ .ad09, "o" },
+        .{ .ad10, "p" },
+        .{ .ad11, "[" },
+        .{ .ad12, "]" },
+
+        .{ .ac01, "a" },
+        .{ .ac02, "s" },
+        .{ .ac03, "d" },
+        .{ .ac04, "f" },
+        .{ .ac05, "g" },
+        .{ .ac06, "h" },
+        .{ .ac07, "j" },
+        .{ .ac08, "k" },
+        .{ .ac09, "l" },
+        .{ .ac10, ";" },
+        .{ .ac11, "**" },
+        .{ .bksl, "\\" },
+
+        .{ .ab01, "z" },
+        .{ .ab02, "x" },
+        .{ .ab03, "c" },
+        .{ .ab04, "v" },
+        .{ .ab05, "b" },
+        .{ .ab06, "n" },
+        .{ .ab07, "m" },
+        .{ .ab08, "," },
+        .{ .ab09, "." },
+        .{ .ab10, "/" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.base).?, &expected_base_layer);
+
+    const expected_shift_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "~" },
+        .{ .ae01, "!" },
+        .{ .ae02, "@" },
+        .{ .ae03, "#" },
+        .{ .ae04, "$" },
+        .{ .ae05, "%" },
+        .{ .ae06, "^" },
+        .{ .ae07, "&" },
+        .{ .ae08, "*" },
+        .{ .ae09, "(" },
+        .{ .ae10, ")" },
+        .{ .ae11, "_" },
+        .{ .ae12, "+" },
+
+        .{ .ad01, "Q" },
+        .{ .ad02, "W" },
+        .{ .ad03, "E" },
+        .{ .ad04, "R" },
+        .{ .ad05, "T" },
+        .{ .ad06, "Y" },
+        .{ .ad07, "U" },
+        .{ .ad08, "I" },
+        .{ .ad09, "O" },
+        .{ .ad10, "P" },
+        .{ .ad11, "{" },
+        .{ .ad12, "}" },
+
+        .{ .ac01, "A" },
+        .{ .ac02, "S" },
+        .{ .ac03, "D" },
+        .{ .ac04, "F" },
+        .{ .ac05, "G" },
+        .{ .ac06, "H" },
+        .{ .ac07, "J" },
+        .{ .ac08, "K" },
+        .{ .ac09, "L" },
+        .{ .ac10, ":" },
+        .{ .ac11, "*¨" },
+        .{ .bksl, "|" },
+
+        .{ .ab01, "Z" },
+        .{ .ab02, "X" },
+        .{ .ab03, "C" },
+        .{ .ab04, "V" },
+        .{ .ab05, "B" },
+        .{ .ab06, "N" },
+        .{ .ab07, "M" },
+        .{ .ab08, "<" },
+        .{ .ab09, ">" },
+        .{ .ab10, "?" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.shift).?, &expected_shift_layer);
+
+    const expected_odk_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .ae02, "«" },
+        .{ .ae03, "»" },
+        .{ .ae05, "€" },
+
+        .{ .ad03, "é" },
+        .{ .ad06, "ý" },
+        .{ .ad07, "ú" },
+        .{ .ad08, "í" },
+        .{ .ad09, "ó" },
+
+        .{ .ac01, "á" },
+        .{ .ac11, "'" },
+
+        .{ .ab03, "ç" },
+        .{ .ab07, "µ" },
+        .{ .ab08, "·" },
+        .{ .ab09, "…" },
+
+        .{ .spce, "'" },
+    };
+
+    try testAssertLayer(result.layers.get(.odk).?, &expected_odk_layer);
+
+    const expected_odk_shift_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .ae02, "«" },
+        .{ .ae03, "»" },
+        .{ .ae05, "€" },
+
+        .{ .ad03, "É" },
+        .{ .ad06, "Ý" },
+        .{ .ad07, "Ú" },
+        .{ .ad08, "Í" },
+        .{ .ad09, "Ó" },
+
+        .{ .ac01, "Á" },
+        .{ .ac11, "'" },
+
+        .{ .ab03, "Ç" },
+        .{ .ab07, "Μ" },
+        .{ .ab08, "•" },
+        .{ .ab09, "…" },
+
+        .{ .spce, "'" },
+    };
+
+    try testAssertLayer(result.layers.get(.odk_shift).?, &expected_odk_shift_layer);
+
+    const expected_altgr_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "*`" },
+        .{ .ae06, "*^" },
+
+        .{ .ad01, "@" },
+        .{ .ad02, "<" },
+        .{ .ad03, ">" },
+        .{ .ad04, "$" },
+        .{ .ad05, "%" },
+        .{ .ad06, "^" },
+        .{ .ad07, "&" },
+        .{ .ad08, "*" },
+        .{ .ad09, "'" },
+        .{ .ad10, "`" },
+
+        .{ .ac01, "{" },
+        .{ .ac02, "(" },
+        .{ .ac03, ")" },
+        .{ .ac04, "}" },
+        .{ .ac05, "=" },
+        .{ .ac06, "\\" },
+        .{ .ac07, "+" },
+        .{ .ac08, "-" },
+        .{ .ac09, "/" },
+        .{ .ac10, "\"" },
+        .{ .ac11, "*´" },
+
+        .{ .ab01, "~" },
+        .{ .ab02, "[" },
+        .{ .ab03, "]" },
+        .{ .ab04, "_" },
+        .{ .ab05, "#" },
+        .{ .ab06, "|" },
+        .{ .ab07, "!" },
+        .{ .ab08, ";" },
+        .{ .ab09, ":" },
+        .{ .ab10, "?" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.altgr).?, &expected_altgr_layer);
+
+    const expected_altgr_shift_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "*~" },
+        .{ .ae06, "*^" },
+
+        .{ .ad01, "@" },
+        .{ .ad02, "<" },
+        .{ .ad03, ">" },
+        .{ .ad04, "$" },
+        .{ .ad05, "%" },
+        .{ .ad06, "^" },
+        .{ .ad07, "&" },
+        .{ .ad08, "*" },
+        .{ .ad09, "'" },
+        .{ .ad10, "`" },
+
+        .{ .ac01, "{" },
+        .{ .ac02, "(" },
+        .{ .ac03, ")" },
+        .{ .ac04, "}" },
+        .{ .ac05, "=" },
+        .{ .ac06, "\\" },
+        .{ .ac07, "+" },
+        .{ .ac08, "-" },
+        .{ .ac09, "/" },
+        .{ .ac10, "\"" },
+        .{ .ac11, "*¨" },
+
+        .{ .ab01, "~" },
+        .{ .ab02, "[" },
+        .{ .ab03, "]" },
+        .{ .ab04, "_" },
+        .{ .ab05, "#" },
+        .{ .ab06, "|" },
+        .{ .ab07, "!" },
+        .{ .ab08, ";" },
+        .{ .ab09, ":" },
+        .{ .ab10, "?" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.altgr_shift).?, &expected_altgr_shift_layer);
+}
+
+test "parseKeyboardLayoutFromToml with 1dk" {
+    const toml_to_parse =
+        \\# kalamine keyboard layout descriptor
+        \\name        = "qwerty-custom"  # full layout name, displayed in the keyboard settings
+        \\name8       = "custom"         # short Windows filename: no spaces, no special chars
+        \\locale      = "us"             # locale/language id
+        \\variant     = "custom-variant" # layout variant id
+        \\author      = "nobody"         # author name
+        \\description = "custom QWERTY layout"
+        \\url         = "https://OneDeadKey.github.com/kalamine"
+        \\version     = "0.0.1"
+        \\geometry    = "ANSI"
+        \\
+        \\base = '''
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│ ~   │ !   │ @   │ #   │ $   │ %   │ ^   │ &   │ *   │ (   │ )   │ _   │ +   ┃          ┃
+        \\│ `   │ 1   │ 2 « │ 3 » │ 4   │ 5 € │ 6   │ 7   │ 8   │ 9   │ 0   │ -   │ =   ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┯━━━━━━━┩
+        \\┃        ┃ Q   │ W   │ E   │ R   │ T   │ Y   │ U   │ I   │ O   │ P   │ {   │ }   │ |     │
+        \\┃ ↹      ┃     │     │   é │     │     │   ý │   ú │   í │   ó │     │ [   │ ]   │ \     │
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┲━━━━┷━━━━━━━┪
+        \\┃         ┃ A   │ S   │ D   │ F   │ G   │ H   │ J   │ K   │ L   │ :   │*¨   ┃            ┃
+        \\┃ ⇬       ┃   á │     │     │     │     │     │     │     │     │ ;   │** ' ┃ ⏎          ┃
+        \\┣━━━━━━━━━┻━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┻━━━━━━━━━━━━┫
+        \\┃            ┃ Z   │ X   │ C   │ V   │ B   │ N   │ M   │ < • │ >   │ ?   ┃               ┃
+        \\┃ ⇧          ┃     │     │   ç │     │     │     │   µ │ , · │ . … │ /   ┃ ⇧             ┃
+        \\┣━━━━━━━┳━━━━┻━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
+        \\
+        \\[spacebar]
+        \\1dk         = "'"  # apostrophe
+        \\1dk_shift   = "'"  # apostrophe
+        \\
+    ;
+    var reader = std.Io.Reader.fixed(toml_to_parse);
+
+    var result = try parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{});
+    defer result.deinit();
+
+    try std.testing.expectEqualStrings("qwerty-custom", result.name);
+    try std.testing.expectEqualStrings("custom", result.name8);
+    try expectEqualOptionalString("us", result.locale);
+    try expectEqualOptionalString("custom-variant", result.variant);
+    try expectEqualOptionalString("nobody", result.author);
+    try expectEqualOptionalString("custom QWERTY layout", result.description);
+    try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
+    try expectEqualOptionalString("0.0.1", result.version);
+    try std.testing.expectEqual(Geometry.ANSI, result.geometry);
+    try std.testing.expect(!result.has_altgr);
+    try std.testing.expect(result.has_1dk);
+
+    try std.testing.expectEqual(6, result.layers.size);
+
+    const expected_base_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "`" },
+        .{ .ae01, "1" },
+        .{ .ae02, "2" },
+        .{ .ae03, "3" },
+        .{ .ae04, "4" },
+        .{ .ae05, "5" },
+        .{ .ae06, "6" },
+        .{ .ae07, "7" },
+        .{ .ae08, "8" },
+        .{ .ae09, "9" },
+        .{ .ae10, "0" },
+        .{ .ae11, "-" },
+        .{ .ae12, "=" },
+
+        .{ .ad01, "q" },
+        .{ .ad02, "w" },
+        .{ .ad03, "e" },
+        .{ .ad04, "r" },
+        .{ .ad05, "t" },
+        .{ .ad06, "y" },
+        .{ .ad07, "u" },
+        .{ .ad08, "i" },
+        .{ .ad09, "o" },
+        .{ .ad10, "p" },
+        .{ .ad11, "[" },
+        .{ .ad12, "]" },
+
+        .{ .ac01, "a" },
+        .{ .ac02, "s" },
+        .{ .ac03, "d" },
+        .{ .ac04, "f" },
+        .{ .ac05, "g" },
+        .{ .ac06, "h" },
+        .{ .ac07, "j" },
+        .{ .ac08, "k" },
+        .{ .ac09, "l" },
+        .{ .ac10, ";" },
+        .{ .ac11, "**" },
+        .{ .bksl, "\\" },
+
+        .{ .ab01, "z" },
+        .{ .ab02, "x" },
+        .{ .ab03, "c" },
+        .{ .ab04, "v" },
+        .{ .ab05, "b" },
+        .{ .ab06, "n" },
+        .{ .ab07, "m" },
+        .{ .ab08, "," },
+        .{ .ab09, "." },
+        .{ .ab10, "/" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.base).?, &expected_base_layer);
+
+    const expected_shift_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "~" },
+        .{ .ae01, "!" },
+        .{ .ae02, "@" },
+        .{ .ae03, "#" },
+        .{ .ae04, "$" },
+        .{ .ae05, "%" },
+        .{ .ae06, "^" },
+        .{ .ae07, "&" },
+        .{ .ae08, "*" },
+        .{ .ae09, "(" },
+        .{ .ae10, ")" },
+        .{ .ae11, "_" },
+        .{ .ae12, "+" },
+
+        .{ .ad01, "Q" },
+        .{ .ad02, "W" },
+        .{ .ad03, "E" },
+        .{ .ad04, "R" },
+        .{ .ad05, "T" },
+        .{ .ad06, "Y" },
+        .{ .ad07, "U" },
+        .{ .ad08, "I" },
+        .{ .ad09, "O" },
+        .{ .ad10, "P" },
+        .{ .ad11, "{" },
+        .{ .ad12, "}" },
+
+        .{ .ac01, "A" },
+        .{ .ac02, "S" },
+        .{ .ac03, "D" },
+        .{ .ac04, "F" },
+        .{ .ac05, "G" },
+        .{ .ac06, "H" },
+        .{ .ac07, "J" },
+        .{ .ac08, "K" },
+        .{ .ac09, "L" },
+        .{ .ac10, ":" },
+        .{ .ac11, "*¨" },
+        .{ .bksl, "|" },
+
+        .{ .ab01, "Z" },
+        .{ .ab02, "X" },
+        .{ .ab03, "C" },
+        .{ .ab04, "V" },
+        .{ .ab05, "B" },
+        .{ .ab06, "N" },
+        .{ .ab07, "M" },
+        .{ .ab08, "<" },
+        .{ .ab09, ">" },
+        .{ .ab10, "?" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.shift).?, &expected_shift_layer);
+
+    const expected_odk_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .ae02, "«" },
+        .{ .ae03, "»" },
+        .{ .ae05, "€" },
+
+        .{ .ad03, "é" },
+        .{ .ad06, "ý" },
+        .{ .ad07, "ú" },
+        .{ .ad08, "í" },
+        .{ .ad09, "ó" },
+
+        .{ .ac01, "á" },
+        .{ .ac11, "'" },
+
+        .{ .ab03, "ç" },
+        .{ .ab07, "µ" },
+        .{ .ab08, "·" },
+        .{ .ab09, "…" },
+
+        .{ .spce, "'" },
+    };
+
+    try testAssertLayer(result.layers.get(.odk).?, &expected_odk_layer);
+
+    const expected_odk_shift_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .ae02, "«" },
+        .{ .ae03, "»" },
+        .{ .ae05, "€" },
+
+        .{ .ad03, "É" },
+        .{ .ad06, "Ý" },
+        .{ .ad07, "Ú" },
+        .{ .ad08, "Í" },
+        .{ .ad09, "Ó" },
+
+        .{ .ac01, "Á" },
+        .{ .ac11, "'" },
+
+        .{ .ab03, "Ç" },
+        .{ .ab07, "Μ" },
+        .{ .ab08, "•" },
+        .{ .ab09, "…" },
+
+        .{ .spce, "'" },
+    };
+
+    try testAssertLayer(result.layers.get(.odk_shift).?, &expected_odk_shift_layer);
+
+    const expected_altgr_layer = [_]struct { KeyCode, []const u8 }{};
+
+    try testAssertLayer(result.layers.get(.altgr).?, &expected_altgr_layer);
+
+    const expected_altgr_shift_layer = [_]struct { KeyCode, []const u8 }{};
+
+    try testAssertLayer(result.layers.get(.altgr_shift).?, &expected_altgr_shift_layer);
+}
+
+test "parseKeyboardLayoutFromToml with altgr separate from base" {
+    const toml_to_parse =
+        \\# kalamine keyboard layout descriptor
+        \\name        = "qwerty-custom"  # full layout name, displayed in the keyboard settings
+        \\name8       = "custom"         # short Windows filename: no spaces, no special chars
+        \\locale      = "us"             # locale/language id
+        \\variant     = "custom-variant" # layout variant id
+        \\author      = "nobody"         # author name
+        \\description = "custom QWERTY layout"
+        \\url         = "https://OneDeadKey.github.com/kalamine"
+        \\version     = "0.0.1"
+        \\geometry    = "ANSI"
+        \\
+        \\base = '''
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│ ~   │ !   │ @   │ #   │ $   │ %   │ ^   │ &   │ *   │ (   │ )   │ _   │ +   ┃          ┃
+        \\│ `   │ 1   │ 2   │ 3   │ 4   │ 5   │ 6   │ 7   │ 8   │ 9   │ 0   │ -   │ =   ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┯━━━━━━━┩
+        \\┃        ┃ Q   │ W   │ E   │ R   │ T   │ Y   │ U   │ I   │ O   │ P   │ {   │ }   │ |     │
+        \\┃ ↹      ┃     │     │     │     │     │     │     │     │     │     │ [   │ ]   │ \     │
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┲━━━━┷━━━━━━━┪
+        \\┃         ┃ A   │ S   │ D   │ F   │ G   │ H   │ J   │ K   │ L   │ :   │ "   ┃            ┃
+        \\┃ ⇬       ┃     │     │     │     │     │     │     │     │     │ ;   │ '   ┃ ⏎          ┃
+        \\┣━━━━━━━━━┻━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┻━━━━━━━━━━━━┫
+        \\┃            ┃ Z   │ X   │ C   │ V   │ B   │ N   │ M   │ <   │ >   │ ?   ┃               ┃
+        \\┃ ⇧          ┃     │     │     │     │     │     │     │ ,   │ .   │ /   ┃ ⇧             ┃
+        \\┣━━━━━━━┳━━━━┻━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
+        \\
+        \\altgr = '''
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│  *~ │     │     │     │     │     │     │     │     │     │     │     │     ┃          ┃
+        \\│  *` │     │     │     │     │     │  *^ │     │     │     │     │     │     ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┯━━━━━━━┩
+        \\┃        ┃     │     │     │     │     │     │     │     │     │     │     │     │       │
+        \\┃ ↹      ┃   @ │   < │   > │   $ │   % │   ^ │   & │   * │   ' │   ` │     │     │       │
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┲━━━━┷━━━━━━━┪
+        \\┃         ┃     │     │     │     │     │     │     │     │     │     │  *¨ ┃            ┃
+        \\┃ ⇬       ┃   { │   ( │   ) │   } │   = │   \ │   + │   - │   / │   " │  *´ ┃ ⏎          ┃
+        \\┣━━━━━━━━━┻━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┻━━━━━━━━━━━━┫
+        \\┃            ┃     │     │     │     │     │     │     │     │     │     ┃               ┃
+        \\┃ ⇧          ┃   ~ │   [ │   ] │   _ │   # │   | │   ! │   ; │   : │   ? ┃ ⇧             ┃
+        \\┣━━━━━━━┳━━━━┻━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
+        \\
+    ;
+    var reader = std.Io.Reader.fixed(toml_to_parse);
+
+    var result = try parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{});
+    defer result.deinit();
+
+    try std.testing.expectEqualStrings("qwerty-custom", result.name);
+    try std.testing.expectEqualStrings("custom", result.name8);
+    try expectEqualOptionalString("us", result.locale);
+    try expectEqualOptionalString("custom-variant", result.variant);
+    try expectEqualOptionalString("nobody", result.author);
+    try expectEqualOptionalString("custom QWERTY layout", result.description);
+    try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
+    try expectEqualOptionalString("0.0.1", result.version);
+    try std.testing.expectEqual(Geometry.ANSI, result.geometry);
+    try std.testing.expect(result.has_altgr);
+    try std.testing.expect(!result.has_1dk);
+
+    try std.testing.expectEqual(6, result.layers.size);
+
+    const expected_base_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "`" },
+        .{ .ae01, "1" },
+        .{ .ae02, "2" },
+        .{ .ae03, "3" },
+        .{ .ae04, "4" },
+        .{ .ae05, "5" },
+        .{ .ae06, "6" },
+        .{ .ae07, "7" },
+        .{ .ae08, "8" },
+        .{ .ae09, "9" },
+        .{ .ae10, "0" },
+        .{ .ae11, "-" },
+        .{ .ae12, "=" },
+
+        .{ .ad01, "q" },
+        .{ .ad02, "w" },
+        .{ .ad03, "e" },
+        .{ .ad04, "r" },
+        .{ .ad05, "t" },
+        .{ .ad06, "y" },
+        .{ .ad07, "u" },
+        .{ .ad08, "i" },
+        .{ .ad09, "o" },
+        .{ .ad10, "p" },
+        .{ .ad11, "[" },
+        .{ .ad12, "]" },
+
+        .{ .ac01, "a" },
+        .{ .ac02, "s" },
+        .{ .ac03, "d" },
+        .{ .ac04, "f" },
+        .{ .ac05, "g" },
+        .{ .ac06, "h" },
+        .{ .ac07, "j" },
+        .{ .ac08, "k" },
+        .{ .ac09, "l" },
+        .{ .ac10, ";" },
+        .{ .ac11, "'" },
+        .{ .bksl, "\\" },
+
+        .{ .ab01, "z" },
+        .{ .ab02, "x" },
+        .{ .ab03, "c" },
+        .{ .ab04, "v" },
+        .{ .ab05, "b" },
+        .{ .ab06, "n" },
+        .{ .ab07, "m" },
+        .{ .ab08, "," },
+        .{ .ab09, "." },
+        .{ .ab10, "/" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.base).?, &expected_base_layer);
+
+    const expected_shift_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "~" },
+        .{ .ae01, "!" },
+        .{ .ae02, "@" },
+        .{ .ae03, "#" },
+        .{ .ae04, "$" },
+        .{ .ae05, "%" },
+        .{ .ae06, "^" },
+        .{ .ae07, "&" },
+        .{ .ae08, "*" },
+        .{ .ae09, "(" },
+        .{ .ae10, ")" },
+        .{ .ae11, "_" },
+        .{ .ae12, "+" },
+
+        .{ .ad01, "Q" },
+        .{ .ad02, "W" },
+        .{ .ad03, "E" },
+        .{ .ad04, "R" },
+        .{ .ad05, "T" },
+        .{ .ad06, "Y" },
+        .{ .ad07, "U" },
+        .{ .ad08, "I" },
+        .{ .ad09, "O" },
+        .{ .ad10, "P" },
+        .{ .ad11, "{" },
+        .{ .ad12, "}" },
+
+        .{ .ac01, "A" },
+        .{ .ac02, "S" },
+        .{ .ac03, "D" },
+        .{ .ac04, "F" },
+        .{ .ac05, "G" },
+        .{ .ac06, "H" },
+        .{ .ac07, "J" },
+        .{ .ac08, "K" },
+        .{ .ac09, "L" },
+        .{ .ac10, ":" },
+        .{ .ac11, "\"" },
+        .{ .bksl, "|" },
+
+        .{ .ab01, "Z" },
+        .{ .ab02, "X" },
+        .{ .ab03, "C" },
+        .{ .ab04, "V" },
+        .{ .ab05, "B" },
+        .{ .ab06, "N" },
+        .{ .ab07, "M" },
+        .{ .ab08, "<" },
+        .{ .ab09, ">" },
+        .{ .ab10, "?" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.shift).?, &expected_shift_layer);
+
+    const expected_odk_layer = [_]struct { KeyCode, []const u8 }{};
+
+    try testAssertLayer(result.layers.get(.odk).?, &expected_odk_layer);
+
+    const expected_odk_shift_layer = [_]struct { KeyCode, []const u8 }{};
+
+    try testAssertLayer(result.layers.get(.odk_shift).?, &expected_odk_shift_layer);
+
+    const expected_altgr_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "*`" },
+        .{ .ae06, "*^" },
+
+        .{ .ad01, "@" },
+        .{ .ad02, "<" },
+        .{ .ad03, ">" },
+        .{ .ad04, "$" },
+        .{ .ad05, "%" },
+        .{ .ad06, "^" },
+        .{ .ad07, "&" },
+        .{ .ad08, "*" },
+        .{ .ad09, "'" },
+        .{ .ad10, "`" },
+
+        .{ .ac01, "{" },
+        .{ .ac02, "(" },
+        .{ .ac03, ")" },
+        .{ .ac04, "}" },
+        .{ .ac05, "=" },
+        .{ .ac06, "\\" },
+        .{ .ac07, "+" },
+        .{ .ac08, "-" },
+        .{ .ac09, "/" },
+        .{ .ac10, "\"" },
+        .{ .ac11, "*´" },
+
+        .{ .ab01, "~" },
+        .{ .ab02, "[" },
+        .{ .ab03, "]" },
+        .{ .ab04, "_" },
+        .{ .ab05, "#" },
+        .{ .ab06, "|" },
+        .{ .ab07, "!" },
+        .{ .ab08, ";" },
+        .{ .ab09, ":" },
+        .{ .ab10, "?" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.altgr).?, &expected_altgr_layer);
+
+    const expected_altgr_shift_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "*~" },
+        .{ .ae06, "*^" },
+
+        .{ .ad01, "@" },
+        .{ .ad02, "<" },
+        .{ .ad03, ">" },
+        .{ .ad04, "$" },
+        .{ .ad05, "%" },
+        .{ .ad06, "^" },
+        .{ .ad07, "&" },
+        .{ .ad08, "*" },
+        .{ .ad09, "'" },
+        .{ .ad10, "`" },
+
+        .{ .ac01, "{" },
+        .{ .ac02, "(" },
+        .{ .ac03, ")" },
+        .{ .ac04, "}" },
+        .{ .ac05, "=" },
+        .{ .ac06, "\\" },
+        .{ .ac07, "+" },
+        .{ .ac08, "-" },
+        .{ .ac09, "/" },
+        .{ .ac10, "\"" },
+        .{ .ac11, "*¨" },
+
+        .{ .ab01, "~" },
+        .{ .ab02, "[" },
+        .{ .ab03, "]" },
+        .{ .ab04, "_" },
+        .{ .ab05, "#" },
+        .{ .ab06, "|" },
+        .{ .ab07, "!" },
+        .{ .ab08, ";" },
+        .{ .ab09, ":" },
+        .{ .ab10, "?" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.altgr_shift).?, &expected_altgr_shift_layer);
+}
+
+test "parseKeyboardLayoutFromToml with altgr on base" {
+    const toml_to_parse =
+        \\# kalamine keyboard layout descriptor
+        \\name        = "qwerty-custom"  # full layout name, displayed in the keyboard settings
+        \\name8       = "custom"         # short Windows filename: no spaces, no special chars
+        \\locale      = "us"             # locale/language id
+        \\variant     = "custom-variant" # layout variant id
+        \\author      = "nobody"         # author name
+        \\description = "custom QWERTY layout"
+        \\url         = "https://OneDeadKey.github.com/kalamine"
+        \\version     = "0.0.1"
+        \\geometry    = "ANSI"
+        \\
+        \\full = '''
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│ ~*~ │ !   │ @   │ #   │ $   │ %   │ ^   │ &   │ *   │ (   │ )   │ _   │ +   ┃          ┃
+        \\│ `*` │ 1   │ 2   │ 3   │ 4   │ 5   │ 6*^ │ 7   │ 8   │ 9   │ 0   │ -   │ =   ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┯━━━━━━━┩
+        \\┃        ┃ Q   │ W   │ E   │ R   │ T   │ Y   │ U   │ I   │ O   │ P   │ {   │ }   │ |     │
+        \\┃ ↹      ┃   @ │   < │   > │   $ │   % │   ^ │   & │   * │   ' │   ` │ [   │ ]   │ \     │
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┲━━━━┷━━━━━━━┪
+        \\┃         ┃ A   │ S   │ D   │ F   │ G   │ H   │ J   │ K   │ L   │ :   │ "*¨ ┃            ┃
+        \\┃ ⇬       ┃   { │   ( │   ) │   } │   = │   \ │   + │   - │   / │ ; " │ '*´ ┃ ⏎          ┃
+        \\┣━━━━━━━━━┻━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┻━━━━━━━━━━━━┫
+        \\┃            ┃ Z   │ X   │ C   │ V   │ B   │ N   │ M   │ <   │ >   │ ?   ┃               ┃
+        \\┃ ⇧          ┃   ~ │   [ │   ] │   _ │   # │   | │   ! │ , ; │ . : │ / ? ┃ ⇧             ┃
+        \\┣━━━━━━━┳━━━━┻━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
+        \\
+    ;
+    var reader = std.Io.Reader.fixed(toml_to_parse);
+
+    var result = try parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{});
+    defer result.deinit();
+
+    try std.testing.expectEqualStrings("qwerty-custom", result.name);
+    try std.testing.expectEqualStrings("custom", result.name8);
+    try expectEqualOptionalString("us", result.locale);
+    try expectEqualOptionalString("custom-variant", result.variant);
+    try expectEqualOptionalString("nobody", result.author);
+    try expectEqualOptionalString("custom QWERTY layout", result.description);
+    try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
+    try expectEqualOptionalString("0.0.1", result.version);
+    try std.testing.expectEqual(Geometry.ANSI, result.geometry);
+    try std.testing.expect(result.has_altgr);
+    try std.testing.expect(!result.has_1dk);
+
+    try std.testing.expectEqual(6, result.layers.size);
+
+    const expected_base_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "`" },
+        .{ .ae01, "1" },
+        .{ .ae02, "2" },
+        .{ .ae03, "3" },
+        .{ .ae04, "4" },
+        .{ .ae05, "5" },
+        .{ .ae06, "6" },
+        .{ .ae07, "7" },
+        .{ .ae08, "8" },
+        .{ .ae09, "9" },
+        .{ .ae10, "0" },
+        .{ .ae11, "-" },
+        .{ .ae12, "=" },
+
+        .{ .ad01, "q" },
+        .{ .ad02, "w" },
+        .{ .ad03, "e" },
+        .{ .ad04, "r" },
+        .{ .ad05, "t" },
+        .{ .ad06, "y" },
+        .{ .ad07, "u" },
+        .{ .ad08, "i" },
+        .{ .ad09, "o" },
+        .{ .ad10, "p" },
+        .{ .ad11, "[" },
+        .{ .ad12, "]" },
+
+        .{ .ac01, "a" },
+        .{ .ac02, "s" },
+        .{ .ac03, "d" },
+        .{ .ac04, "f" },
+        .{ .ac05, "g" },
+        .{ .ac06, "h" },
+        .{ .ac07, "j" },
+        .{ .ac08, "k" },
+        .{ .ac09, "l" },
+        .{ .ac10, ";" },
+        .{ .ac11, "'" },
+        .{ .bksl, "\\" },
+
+        .{ .ab01, "z" },
+        .{ .ab02, "x" },
+        .{ .ab03, "c" },
+        .{ .ab04, "v" },
+        .{ .ab05, "b" },
+        .{ .ab06, "n" },
+        .{ .ab07, "m" },
+        .{ .ab08, "," },
+        .{ .ab09, "." },
+        .{ .ab10, "/" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.base).?, &expected_base_layer);
+
+    const expected_shift_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "~" },
+        .{ .ae01, "!" },
+        .{ .ae02, "@" },
+        .{ .ae03, "#" },
+        .{ .ae04, "$" },
+        .{ .ae05, "%" },
+        .{ .ae06, "^" },
+        .{ .ae07, "&" },
+        .{ .ae08, "*" },
+        .{ .ae09, "(" },
+        .{ .ae10, ")" },
+        .{ .ae11, "_" },
+        .{ .ae12, "+" },
+
+        .{ .ad01, "Q" },
+        .{ .ad02, "W" },
+        .{ .ad03, "E" },
+        .{ .ad04, "R" },
+        .{ .ad05, "T" },
+        .{ .ad06, "Y" },
+        .{ .ad07, "U" },
+        .{ .ad08, "I" },
+        .{ .ad09, "O" },
+        .{ .ad10, "P" },
+        .{ .ad11, "{" },
+        .{ .ad12, "}" },
+
+        .{ .ac01, "A" },
+        .{ .ac02, "S" },
+        .{ .ac03, "D" },
+        .{ .ac04, "F" },
+        .{ .ac05, "G" },
+        .{ .ac06, "H" },
+        .{ .ac07, "J" },
+        .{ .ac08, "K" },
+        .{ .ac09, "L" },
+        .{ .ac10, ":" },
+        .{ .ac11, "\"" },
+        .{ .bksl, "|" },
+
+        .{ .ab01, "Z" },
+        .{ .ab02, "X" },
+        .{ .ab03, "C" },
+        .{ .ab04, "V" },
+        .{ .ab05, "B" },
+        .{ .ab06, "N" },
+        .{ .ab07, "M" },
+        .{ .ab08, "<" },
+        .{ .ab09, ">" },
+        .{ .ab10, "?" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.shift).?, &expected_shift_layer);
+
+    const expected_odk_layer = [_]struct { KeyCode, []const u8 }{};
+
+    try testAssertLayer(result.layers.get(.odk).?, &expected_odk_layer);
+
+    const expected_odk_shift_layer = [_]struct { KeyCode, []const u8 }{};
+
+    try testAssertLayer(result.layers.get(.odk_shift).?, &expected_odk_shift_layer);
+
+    const expected_altgr_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "*`" },
+        .{ .ae06, "*^" },
+
+        .{ .ad01, "@" },
+        .{ .ad02, "<" },
+        .{ .ad03, ">" },
+        .{ .ad04, "$" },
+        .{ .ad05, "%" },
+        .{ .ad06, "^" },
+        .{ .ad07, "&" },
+        .{ .ad08, "*" },
+        .{ .ad09, "'" },
+        .{ .ad10, "`" },
+
+        .{ .ac01, "{" },
+        .{ .ac02, "(" },
+        .{ .ac03, ")" },
+        .{ .ac04, "}" },
+        .{ .ac05, "=" },
+        .{ .ac06, "\\" },
+        .{ .ac07, "+" },
+        .{ .ac08, "-" },
+        .{ .ac09, "/" },
+        .{ .ac10, "\"" },
+        .{ .ac11, "*´" },
+
+        .{ .ab01, "~" },
+        .{ .ab02, "[" },
+        .{ .ab03, "]" },
+        .{ .ab04, "_" },
+        .{ .ab05, "#" },
+        .{ .ab06, "|" },
+        .{ .ab07, "!" },
+        .{ .ab08, ";" },
+        .{ .ab09, ":" },
+        .{ .ab10, "?" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.altgr).?, &expected_altgr_layer);
+
+    const expected_altgr_shift_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "*~" },
+        .{ .ae06, "*^" },
+
+        .{ .ad01, "@" },
+        .{ .ad02, "<" },
+        .{ .ad03, ">" },
+        .{ .ad04, "$" },
+        .{ .ad05, "%" },
+        .{ .ad06, "^" },
+        .{ .ad07, "&" },
+        .{ .ad08, "*" },
+        .{ .ad09, "'" },
+        .{ .ad10, "`" },
+
+        .{ .ac01, "{" },
+        .{ .ac02, "(" },
+        .{ .ac03, ")" },
+        .{ .ac04, "}" },
+        .{ .ac05, "=" },
+        .{ .ac06, "\\" },
+        .{ .ac07, "+" },
+        .{ .ac08, "-" },
+        .{ .ac09, "/" },
+        .{ .ac10, "\"" },
+        .{ .ac11, "*¨" },
+
+        .{ .ab01, "~" },
+        .{ .ab02, "[" },
+        .{ .ab03, "]" },
+        .{ .ab04, "_" },
+        .{ .ab05, "#" },
+        .{ .ab06, "|" },
+        .{ .ab07, "!" },
+        .{ .ab08, ";" },
+        .{ .ab09, ":" },
+        .{ .ab10, "?" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.altgr_shift).?, &expected_altgr_shift_layer);
+}
+
+test "parseKeyboardLayoutFromToml with base only" {
+    const toml_to_parse =
+        \\# kalamine keyboard layout descriptor
+        \\name        = "qwerty-custom"  # full layout name, displayed in the keyboard settings
+        \\name8       = "custom"         # short Windows filename: no spaces, no special chars
+        \\locale      = "us"             # locale/language id
+        \\variant     = "custom-variant" # layout variant id
+        \\author      = "nobody"         # author name
+        \\description = "custom QWERTY layout"
+        \\url         = "https://OneDeadKey.github.com/kalamine"
+        \\version     = "0.0.1"
+        \\geometry    = "ANSI"
+        \\
+        \\base = '''
+        \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓
+        \\│ ~   │ !   │ @   │ #   │ $   │ %   │ ^   │ &   │ *   │ (   │ )   │ _   │ +   ┃          ┃
+        \\│ `   │ 1   │ 2   │ 3   │ 4   │ 5   │ 6   │ 7   │ 8   │ 9   │ 0   │ -   │ =   ┃ ⌫        ┃
+        \\┢━━━━━┷━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┺━━┯━━━━━━━┩
+        \\┃        ┃ Q   │ W   │ E   │ R   │ T   │ Y   │ U   │ I   │ O   │ P   │ {   │ }   │ |     │
+        \\┃ ↹      ┃     │     │     │     │     │     │     │     │     │     │ [   │ ]   │ \     │
+        \\┣━━━━━━━━┻┱────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┬────┴┲━━━━┷━━━━━━━┪
+        \\┃         ┃ A   │ S   │ D   │ F   │ G   │ H   │ J   │ K   │ L   │ :   │ "   ┃            ┃
+        \\┃ ⇬       ┃     │     │     │     │     │     │     │     │     │ ;   │ '   ┃ ⏎          ┃
+        \\┣━━━━━━━━━┻━━┱──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┬──┴──┲━━┻━━━━━━━━━━━━┫
+        \\┃            ┃ Z   │ X   │ C   │ V   │ B   │ N   │ M   │ <   │ >   │ ?   ┃               ┃
+        \\┃ ⇧          ┃     │     │     │     │     │     │     │ ,   │ .   │ /   ┃ ⇧             ┃
+        \\┣━━━━━━━┳━━━━┻━━┳━━┷━━━━┱┴─────┴─────┴─────┴─────┴─────┴─┲━━━┷━━━┳━┷━━━━━╋━━━━━━━┳━━━━━━━┫
+        \\┃       ┃       ┃       ┃                                ┃       ┃       ┃       ┃       ┃
+        \\┃ Ctrl  ┃ super ┃ Alt   ┃ ␣                              ┃ Alt   ┃ super ┃ menu  ┃ Ctrl  ┃
+        \\┗━━━━━━━┻━━━━━━━┻━━━━━━━┹────────────────────────────────┺━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━┛
+        \\'''
+        \\
+    ;
+    var reader = std.Io.Reader.fixed(toml_to_parse);
+
+    var result = try parseKeyboardLayoutFromToml(std.testing.allocator, &reader, .{});
+    defer result.deinit();
+
+    try std.testing.expectEqualStrings("qwerty-custom", result.name);
+    try std.testing.expectEqualStrings("custom", result.name8);
+    try expectEqualOptionalString("us", result.locale);
+    try expectEqualOptionalString("custom-variant", result.variant);
+    try expectEqualOptionalString("nobody", result.author);
+    try expectEqualOptionalString("custom QWERTY layout", result.description);
+    try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
+    try expectEqualOptionalString("0.0.1", result.version);
+    try std.testing.expectEqual(Geometry.ANSI, result.geometry);
+    try std.testing.expect(!result.has_altgr);
+    try std.testing.expect(!result.has_1dk);
+
+    try std.testing.expectEqual(6, result.layers.size);
+
+    const expected_base_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "`" },
+        .{ .ae01, "1" },
+        .{ .ae02, "2" },
+        .{ .ae03, "3" },
+        .{ .ae04, "4" },
+        .{ .ae05, "5" },
+        .{ .ae06, "6" },
+        .{ .ae07, "7" },
+        .{ .ae08, "8" },
+        .{ .ae09, "9" },
+        .{ .ae10, "0" },
+        .{ .ae11, "-" },
+        .{ .ae12, "=" },
+
+        .{ .ad01, "q" },
+        .{ .ad02, "w" },
+        .{ .ad03, "e" },
+        .{ .ad04, "r" },
+        .{ .ad05, "t" },
+        .{ .ad06, "y" },
+        .{ .ad07, "u" },
+        .{ .ad08, "i" },
+        .{ .ad09, "o" },
+        .{ .ad10, "p" },
+        .{ .ad11, "[" },
+        .{ .ad12, "]" },
+
+        .{ .ac01, "a" },
+        .{ .ac02, "s" },
+        .{ .ac03, "d" },
+        .{ .ac04, "f" },
+        .{ .ac05, "g" },
+        .{ .ac06, "h" },
+        .{ .ac07, "j" },
+        .{ .ac08, "k" },
+        .{ .ac09, "l" },
+        .{ .ac10, ";" },
+        .{ .ac11, "'" },
+        .{ .bksl, "\\" },
+
+        .{ .ab01, "z" },
+        .{ .ab02, "x" },
+        .{ .ab03, "c" },
+        .{ .ab04, "v" },
+        .{ .ab05, "b" },
+        .{ .ab06, "n" },
+        .{ .ab07, "m" },
+        .{ .ab08, "," },
+        .{ .ab09, "." },
+        .{ .ab10, "/" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.base).?, &expected_base_layer);
+
+    const expected_shift_layer = [_]struct { KeyCode, []const u8 }{
+        .{ .tlde, "~" },
+        .{ .ae01, "!" },
+        .{ .ae02, "@" },
+        .{ .ae03, "#" },
+        .{ .ae04, "$" },
+        .{ .ae05, "%" },
+        .{ .ae06, "^" },
+        .{ .ae07, "&" },
+        .{ .ae08, "*" },
+        .{ .ae09, "(" },
+        .{ .ae10, ")" },
+        .{ .ae11, "_" },
+        .{ .ae12, "+" },
+
+        .{ .ad01, "Q" },
+        .{ .ad02, "W" },
+        .{ .ad03, "E" },
+        .{ .ad04, "R" },
+        .{ .ad05, "T" },
+        .{ .ad06, "Y" },
+        .{ .ad07, "U" },
+        .{ .ad08, "I" },
+        .{ .ad09, "O" },
+        .{ .ad10, "P" },
+        .{ .ad11, "{" },
+        .{ .ad12, "}" },
+
+        .{ .ac01, "A" },
+        .{ .ac02, "S" },
+        .{ .ac03, "D" },
+        .{ .ac04, "F" },
+        .{ .ac05, "G" },
+        .{ .ac06, "H" },
+        .{ .ac07, "J" },
+        .{ .ac08, "K" },
+        .{ .ac09, "L" },
+        .{ .ac10, ":" },
+        .{ .ac11, "\"" },
+        .{ .bksl, "|" },
+
+        .{ .ab01, "Z" },
+        .{ .ab02, "X" },
+        .{ .ab03, "C" },
+        .{ .ab04, "V" },
+        .{ .ab05, "B" },
+        .{ .ab06, "N" },
+        .{ .ab07, "M" },
+        .{ .ab08, "<" },
+        .{ .ab09, ">" },
+        .{ .ab10, "?" },
+
+        .{ .spce, " " },
+    };
+
+    try testAssertLayer(result.layers.get(.shift).?, &expected_shift_layer);
+
+    const expected_odk_layer = [_]struct { KeyCode, []const u8 }{};
+
+    try testAssertLayer(result.layers.get(.odk).?, &expected_odk_layer);
+
+    const expected_odk_shift_layer = [_]struct { KeyCode, []const u8 }{};
+
+    try testAssertLayer(result.layers.get(.odk_shift).?, &expected_odk_shift_layer);
+
+    const expected_altgr_layer = [_]struct { KeyCode, []const u8 }{};
+
+    try testAssertLayer(result.layers.get(.altgr).?, &expected_altgr_layer);
+
+    const expected_altgr_shift_layer = [_]struct { KeyCode, []const u8 }{};
+
+    try testAssertLayer(result.layers.get(.altgr_shift).?, &expected_altgr_shift_layer);
+}
+
 test "parseLayout full layout" {
     const layout =
         \\
@@ -829,8 +2119,6 @@ test "parseLayout empty layout" {
     try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab09));
     try std.testing.expectEqualDeep(ParsedKey{}, result.get(.ab10));
 }
-
-const expectEqualOptionalString = @import("../test/util.zig").expectEqualOptionalString;
 
 test "parseLayout no first line return" {
     const layout =
