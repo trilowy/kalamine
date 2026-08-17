@@ -77,13 +77,18 @@ pub const KeyboardLayout = struct {
     /// If a layer has an non-shifted character, its shifted layer will always contains the
     /// shifted version and vice-versa
     layers: std.AutoHashMapUnmanaged(Layer, std.AutoHashMapUnmanaged(KeyCode, []const u8)),
-    // TODO: see to use layers and maybe function for these bool
-    has_altgr: bool = false,
-    has_odk: bool = false,
 
     pub fn deinit(self: *KeyboardLayout) void {
         self.arena_allocator.deinit();
         self.* = undefined;
+    }
+
+    pub fn hasAltgr(self: *const KeyboardLayout) bool {
+        return self.layers.contains(.altgr);
+    }
+
+    pub fn hasOdk(self: *const KeyboardLayout) bool {
+        return self.layers.contains(.odk);
     }
 };
 

@@ -60,15 +60,15 @@ fn fillTemplate(
     if (layers[0] == .base) {
         base_layer = keyboard_layout.layers.get(layers[0]);
         base_layer_shift = keyboard_layout.layers.get(layers[0].shifted());
-    } else if ((layers[0] == .altgr and keyboard_layout.has_altgr) or
-        (layers[0] == .odk and keyboard_layout.has_odk))
+    } else if ((layers[0] == .altgr and keyboard_layout.hasAltgr()) or
+        (layers[0] == .odk and keyboard_layout.hasOdk()))
     {
         altgr_odk_layer = keyboard_layout.layers.get(layers[0]);
         altgr_odk_layer_shift = keyboard_layout.layers.get(layers[0].shifted());
     }
 
-    if ((layers[1] == .altgr and keyboard_layout.has_altgr) or
-        (layers[1] == .odk and keyboard_layout.has_odk))
+    if ((layers[1] == .altgr and keyboard_layout.hasAltgr()) or
+        (layers[1] == .odk and keyboard_layout.hasOdk()))
     {
         altgr_odk_layer = keyboard_layout.layers.get(layers[1].?);
         altgr_odk_layer_shift = keyboard_layout.layers.get(layers[1].?.shifted());
@@ -469,8 +469,6 @@ fn testInitKeyboardLayout(arena: *std.heap.ArenaAllocator) !KeyboardLayout {
         .version = null,
         .geometry = .ISO,
         .layers = layers,
-        .has_altgr = true,
-        .has_odk = true,
     };
 }
 
@@ -511,7 +509,8 @@ test "getBase without 1dk" {
     var keyboard_layout = try testInitKeyboardLayout(&arena);
     defer arena.deinit();
 
-    keyboard_layout.has_odk = false;
+    _ = keyboard_layout.layers.remove(.odk);
+    _ = keyboard_layout.layers.remove(.odk_shift);
 
     const expected =
         \\┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┲━━━━━━━━━━┓

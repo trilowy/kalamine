@@ -107,19 +107,15 @@ pub fn parseKeyboardLayoutFromToml(
             spacebar_shift = try arena.dupe(u8, shift);
         }
         if (spacebar_to_parse.altgr) |altgr| {
-            keyboard_layout.has_altgr = true;
             spacebar_altgr = try arena.dupe(u8, altgr);
         }
         if (spacebar_to_parse.altgr_shift) |altgr_shift| {
-            keyboard_layout.has_altgr = true;
             spacebar_altgr_shift = try arena.dupe(u8, altgr_shift);
         }
         if (spacebar_to_parse.@"1dk") |odk| {
-            keyboard_layout.has_odk = true;
             spacebar_odk = try arena.dupe(u8, odk);
         }
         if (spacebar_to_parse.@"1dk_shift") |odk_shift| {
-            keyboard_layout.has_odk = true;
             spacebar_odk_shift = try arena.dupe(u8, odk_shift);
         }
     }
@@ -578,13 +574,11 @@ fn parseLayout(
     if (altgr_odk_layer_type == .altgr and
         (altgr_odk_layer.?.size != 0 or altgr_odk_layer_shift.?.size != 0))
     {
-        keyboard_layout.has_altgr = true;
         try keyboard_layout.layers.put(arena, .altgr, altgr_odk_layer.?);
         try keyboard_layout.layers.put(arena, .altgr_shift, altgr_odk_layer_shift.?);
     } else if (altgr_odk_layer_type == .odk and
         (altgr_odk_layer.?.size != 0 or altgr_odk_layer_shift.?.size != 0))
     {
-        keyboard_layout.has_odk = true;
         try keyboard_layout.layers.put(arena, .odk, altgr_odk_layer.?);
         try keyboard_layout.layers.put(arena, .odk_shift, altgr_odk_layer_shift.?);
     }
@@ -675,8 +669,6 @@ test "parseKeyboardLayoutFromToml with 1dk and altgr" {
     try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
-    try std.testing.expect(result.has_altgr);
-    try std.testing.expect(result.has_odk);
 
     try std.testing.expectEqual(6, result.layers.size);
 
@@ -980,8 +972,6 @@ test "parseKeyboardLayoutFromToml with 1dk" {
     try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
-    try std.testing.expect(!result.has_altgr);
-    try std.testing.expect(result.has_odk);
 
     try std.testing.expectEqual(4, result.layers.size);
 
@@ -1214,8 +1204,6 @@ test "parseKeyboardLayoutFromToml with altgr separate from base" {
     try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
-    try std.testing.expect(result.has_altgr);
-    try std.testing.expect(!result.has_odk);
 
     try std.testing.expectEqual(4, result.layers.size);
 
@@ -1467,8 +1455,6 @@ test "parseKeyboardLayoutFromToml with altgr on base" {
     try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
-    try std.testing.expect(result.has_altgr);
-    try std.testing.expect(!result.has_odk);
 
     try std.testing.expectEqual(4, result.layers.size);
 
@@ -1720,8 +1706,6 @@ test "parseKeyboardLayoutFromToml with base only" {
     try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
-    try std.testing.expect(!result.has_altgr);
-    try std.testing.expect(!result.has_odk);
 
     try std.testing.expectEqual(2, result.layers.size);
 
@@ -1878,8 +1862,6 @@ test "parseKeyboardLayoutFromToml with empty base" {
     try expectEqualOptionalString(null, result.url);
     try expectEqualOptionalString(null, result.version);
     try std.testing.expectEqual(Geometry.ISO, result.geometry);
-    try std.testing.expect(!result.has_altgr);
-    try std.testing.expect(!result.has_odk);
 
     try std.testing.expectEqual(2, result.layers.size);
 
