@@ -27,12 +27,23 @@ pub fn run(allocator: std.mem.Allocator, options: Options, parse_options: ParseO
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
+    try writeDummyToml(allocator, stdout, &options, parse_options);
+
+    try stdout.flush();
+}
+
+fn writeDummyToml(
+    allocator: std.mem.Allocator,
+    writer: *std.Io.Writer,
+    options: *const Options,
+    parse_options: ParseOptions,
+) !void {
     // Make a dummy keyboard layout to get full Qwerty example parsed
-    var keyboard_layout = try dummyLayout(allocator, &options, parse_options);
+    var keyboard_layout = try dummyLayout(allocator, options, parse_options);
     defer keyboard_layout.deinit();
 
-    try stdout.writeAll(dummy_metadata);
-    try stdout.print(dummy_geometry, .{@tagName(options.geometry)});
+    try writer.writeAll(dummy_metadata);
+    try writer.print(dummy_geometry, .{@tagName(options.geometry)});
     keyboard_layout.geometry = options.geometry;
 
     // Write an ASCII art description of a default layout
@@ -43,32 +54,30 @@ pub fn run(allocator: std.mem.Allocator, options: Options, parse_options: ParseO
         const base = try toml_generator.getBase(allocator, &keyboard_layout);
         defer allocator.free(base);
 
-        try stdout.print(dummy_layer, .{ "base", base });
+        try writer.print(dummy_layer, .{ "base", base });
 
         if (options.altgr) {
             const altgr = try toml_generator.getAltgr(allocator, &keyboard_layout);
             defer allocator.free(altgr);
 
-            try stdout.print(dummy_layer, .{ "altgr", altgr });
+            try writer.print(dummy_layer, .{ "altgr", altgr });
         }
 
-        try stdout.writeAll(dummy_spacebar_odk);
+        try writer.writeAll(dummy_spacebar_odk);
     } else if (options.altgr) {
         const full = try toml_generator.getFull(allocator, &keyboard_layout);
         defer allocator.free(full);
 
-        try stdout.print(dummy_layer, .{ "full", full });
+        try writer.print(dummy_layer, .{ "full", full });
     } else {
         const base = try toml_generator.getBase(allocator, &keyboard_layout);
         defer allocator.free(base);
 
-        try stdout.print(dummy_layer, .{ "base", base });
+        try writer.print(dummy_layer, .{ "base", base });
     }
 
     // TODO: kalamine/help.py:149
     // TODO: kalamine/help.py:47 user_guide.yaml
-
-    try stdout.flush();
 }
 
 /// Create a dummy (QWERTY) layout with the given characteristics
