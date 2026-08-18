@@ -609,7 +609,7 @@ test "parseKeyboardLayoutFromToml with 1dk and altgr" {
         \\variant     = "custom-variant" # layout variant id
         \\author      = "nobody"         # author name
         \\description = "custom QWERTY layout"
-        \\url         = "https://OneDeadKey.github.com/kalamine"
+        \\url         = "https://github.com/OneDeadKey/kalamine"
         \\version     = "0.0.1"
         \\geometry    = "ANSI"
         \\
@@ -667,7 +667,7 @@ test "parseKeyboardLayoutFromToml with 1dk and altgr" {
     try expectEqualOptionalString("custom-variant", result.variant);
     try expectEqualOptionalString("nobody", result.author);
     try expectEqualOptionalString("custom QWERTY layout", result.description);
-    try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
+    try expectEqualOptionalString("https://github.com/OneDeadKey/kalamine", result.url);
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
 
@@ -931,7 +931,7 @@ test "parseKeyboardLayoutFromToml with 1dk" {
         \\variant     = "custom-variant" # layout variant id
         \\author      = "nobody"         # author name
         \\description = "custom QWERTY layout"
-        \\url         = "https://OneDeadKey.github.com/kalamine"
+        \\url         = "https://github.com/OneDeadKey/kalamine"
         \\version     = "0.0.1"
         \\geometry    = "ANSI"
         \\
@@ -970,7 +970,7 @@ test "parseKeyboardLayoutFromToml with 1dk" {
     try expectEqualOptionalString("custom-variant", result.variant);
     try expectEqualOptionalString("nobody", result.author);
     try expectEqualOptionalString("custom QWERTY layout", result.description);
-    try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
+    try expectEqualOptionalString("https://github.com/OneDeadKey/kalamine", result.url);
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
 
@@ -1148,7 +1148,7 @@ test "parseKeyboardLayoutFromToml with altgr separate from base" {
         \\variant     = "custom-variant" # layout variant id
         \\author      = "nobody"         # author name
         \\description = "custom QWERTY layout"
-        \\url         = "https://OneDeadKey.github.com/kalamine"
+        \\url         = "https://github.com/OneDeadKey/kalamine"
         \\version     = "0.0.1"
         \\geometry    = "ANSI"
         \\
@@ -1202,7 +1202,7 @@ test "parseKeyboardLayoutFromToml with altgr separate from base" {
     try expectEqualOptionalString("custom-variant", result.variant);
     try expectEqualOptionalString("nobody", result.author);
     try expectEqualOptionalString("custom QWERTY layout", result.description);
-    try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
+    try expectEqualOptionalString("https://github.com/OneDeadKey/kalamine", result.url);
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
 
@@ -1418,7 +1418,7 @@ test "parseKeyboardLayoutFromToml with altgr on base" {
         \\variant     = "custom-variant" # layout variant id
         \\author      = "nobody"         # author name
         \\description = "custom QWERTY layout"
-        \\url         = "https://OneDeadKey.github.com/kalamine"
+        \\url         = "https://github.com/OneDeadKey/kalamine"
         \\version     = "0.0.1"
         \\geometry    = "ANSI"
         \\
@@ -1453,7 +1453,7 @@ test "parseKeyboardLayoutFromToml with altgr on base" {
     try expectEqualOptionalString("custom-variant", result.variant);
     try expectEqualOptionalString("nobody", result.author);
     try expectEqualOptionalString("custom QWERTY layout", result.description);
-    try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
+    try expectEqualOptionalString("https://github.com/OneDeadKey/kalamine", result.url);
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
 
@@ -1669,7 +1669,7 @@ test "parseKeyboardLayoutFromToml with base only" {
         \\variant     = "custom-variant" # layout variant id
         \\author      = "nobody"         # author name
         \\description = "custom QWERTY layout"
-        \\url         = "https://OneDeadKey.github.com/kalamine"
+        \\url         = "https://github.com/OneDeadKey/kalamine"
         \\version     = "0.0.1"
         \\geometry    = "ANSI"
         \\
@@ -1704,7 +1704,7 @@ test "parseKeyboardLayoutFromToml with base only" {
     try expectEqualOptionalString("custom-variant", result.variant);
     try expectEqualOptionalString("nobody", result.author);
     try expectEqualOptionalString("custom QWERTY layout", result.description);
-    try expectEqualOptionalString("https://OneDeadKey.github.com/kalamine", result.url);
+    try expectEqualOptionalString("https://github.com/OneDeadKey/kalamine", result.url);
     try expectEqualOptionalString("0.0.1", result.version);
     try std.testing.expectEqual(Geometry.ANSI, result.geometry);
 
