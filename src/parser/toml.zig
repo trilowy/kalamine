@@ -96,6 +96,7 @@ pub fn parseKeyboardLayoutFromToml(
 
     // Spacebar
     // TODO: test with Ergo‑L if unicode char is decoded
+    // const str = "He\u{301}"; // Hé
     var spacebar_shift: ?[]const u8 = null;
     var spacebar_altgr: ?[]const u8 = null;
     var spacebar_altgr_shift: ?[]const u8 = null;
