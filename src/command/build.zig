@@ -1,4 +1,5 @@
 const std = @import("std");
+const ParseOptions = @import("../error_handling.zig").ParseOptions;
 
 pub const Options = struct {
     file: []const u8,
@@ -16,7 +17,12 @@ pub const Out = enum {
     svg,
 };
 
-pub fn run(_: Options) !void {
+pub fn run(options: Options, parse_options: ParseOptions) !void {
+    // TODO: to implement
+
+    _ = options;
+    _ = parse_options;
+
     // TODO: Convert TOML/YAML descriptions into OS-specific keyboard drivers.
     // @click.argument(
     //     "layout_descriptors",

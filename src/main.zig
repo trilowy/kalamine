@@ -58,21 +58,16 @@ fn execute(
 
     switch (cmd) {
         .build => |options| {
-            // TODO: to implement
-            try stdout.writeAll("build command not yet implemented\n");
-            try stdout.flush();
-            try build.run(options); // TODO: handle error
-        },
-        .new => |options| {
-            // TODO: to finish implementation
             var diag = Diagnostic{ .allocator = allocator };
             defer diag.deinit();
 
-            new.run(allocator, options, .{ .diagnostic = &diag }) catch |err| {
+            build.run(options, .{ .diagnostic = &diag }) catch |err| {
                 return diag.report(stdout, err);
-                // TODO: do not error handling to do here, just try or panic, 'new' never fails
-                // but use this error reporting for 'build'
             };
+        },
+        .new => |options| {
+            // No error handling because 'new' never fails
+            try new.run(allocator, options, .{});
         },
         .watch => |options| {
             // TODO: to implement
