@@ -16,11 +16,11 @@ pub fn main() u8 {
     const args = std.process.argsAlloc(allocator) catch @panic("Out of memory");
     defer std.process.argsFree(allocator, args);
 
-    var stdout_buffer: [std.heap.page_size_min]u8 = undefined;
+    var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    var stderr_buffer: [std.heap.page_size_min]u8 = undefined;
+    var stderr_buffer: [1024]u8 = undefined;
     var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
     const stderr = &stderr_writer.interface;
 
