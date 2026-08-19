@@ -36,8 +36,7 @@ pub fn build(b: *std.Build) void {
     exe_mod.addImport("toml", toml.module("toml"));
 
     const zg = b.dependency("zg", dep_opts);
-    exe_mod.addImport("Graphemes", zg.module("Graphemes"));
-    exe_mod.addImport("LetterCasing", zg.module("LetterCasing"));
+    exe_mod.addImport("zg", zg.module("zg"));
 
     // This creates another `std.Build.Step.Compile`, but this one builds an executable
     // rather than a static library.

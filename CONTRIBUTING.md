@@ -7,7 +7,7 @@ Zig setup
 
 ### Requirements
 
-- [Zig] 0.15.2
+- [Zig] 0.16.0
 
 
 ### Run
@@ -32,6 +32,19 @@ Zig setup
   ```sh
   ./zig-out/bin/kalamine
   ```
+
+
+### Update dependencies
+
+Check Zig branches on https://github.com/sam701 and:
+```sh
+zig fetch --save git+https://github.com/sam701/zig-toml#zig-0.16
+```
+
+Check release version on https://codeberg.org/atman/zg/releases and:
+```sh
+zig fetch --save https://codeberg.org/atman/zg/archive/v0.16.4.tar.gz
+```
 
 
 [Zig]: https://ziglang.org

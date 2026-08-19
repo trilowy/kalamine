@@ -13,8 +13,8 @@
   in {
     devShells.${system}.default = pkgs.mkShell {
       packages = with pkgs; [
-        zig_0_15
-        zls_0_15 # Zig LSP
+        zig_0_16
+        zls_0_16 # Zig LSP
       ];
     };
   };

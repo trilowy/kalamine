@@ -7,24 +7,22 @@ const watch = @import("command/watch.zig");
 const version = @import("command/version.zig");
 const Diagnostic = @import("error_handling.zig").Diagnostic;
 
-pub fn main() u8 {
-    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-    const allocator = debug_allocator.allocator();
-    defer _ = debug_allocator.deinit();
+pub fn main(init: std.process.Init) u8 {
+    const allocator = init.gpa;
+    const io = init.io;
 
     // Parsing program args
-    const args = std.process.argsAlloc(allocator) catch @panic("Out of memory");
-    defer std.process.argsFree(allocator, args);
+    const args = init.minimal.args.toSlice(init.arena.allocator()) catch @panic("Out of memory");
 
     var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
     var stderr_buffer: [1024]u8 = undefined;
-    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
     const stderr = &stderr_writer.interface;
 
-    execute(allocator, args, stdout, stderr) catch |err|
+    execute(allocator, io, args, stdout, stderr) catch |err|
         switch (err) {
             error.ErrorReported => return 1,
             else => {
@@ -38,6 +36,7 @@ pub fn main() u8 {
 
 fn execute(
     allocator: std.mem.Allocator,
+    io: std.Io,
     args: []const []const u8,
     stdout: *std.Io.Writer,
     stderr: *std.Io.Writer,
@@ -67,7 +66,7 @@ fn execute(
         },
         .new => |options| {
             // No error handling because 'new' never fails
-            try new.run(allocator, options, .{});
+            try new.run(allocator, io, options, .{});
         },
         .watch => |options| {
             // TODO: to implement

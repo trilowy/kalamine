@@ -1,9 +1,10 @@
 //! Output a keyboard layout to TOML representation
 
 const std = @import("std");
-const Graphemes = @import("Graphemes");
-const Grapheme = Graphemes.Grapheme;
-const LetterCasing = @import("LetterCasing");
+const zg = @import("zg");
+const letter_casing = zg.letter_casing;
+const graphemes = zg.graphemes;
+const Grapheme = graphemes.Grapheme;
 const layout = @import("../layout.zig");
 const KeyboardLayout = layout.KeyboardLayout;
 const Layer = layout.Layer;
@@ -45,12 +46,6 @@ fn fillTemplate(
     keyboard_layout: *const KeyboardLayout,
     layers: struct { Layer, ?Layer },
 ) ![]u8 {
-    const graph = try Graphemes.init(allocator);
-    defer graph.deinit(allocator);
-
-    const case = try LetterCasing.init(allocator);
-    defer case.deinit(allocator);
-
     var base_layer: ?std.AutoHashMapUnmanaged(KeyCode, []const u8) = null;
     var base_layer_shift: ?std.AutoHashMapUnmanaged(KeyCode, []const u8) = null;
 
@@ -86,7 +81,7 @@ fn fillTemplate(
     var in_line_column: usize = 0;
     var in_key_column: usize = 0;
 
-    var template_iter = graph.iterator(template);
+    var template_iter = graphemes.iterator(template);
 
     while (template_iter.next()) |tc| {
         const template_char = tc.bytes(template);
@@ -124,7 +119,7 @@ fn fillTemplate(
                         // Check shifted key is not the same
                         if (base_layer_shift) |layer_value| {
                             if (layer_value.get(key)) |shift_key_value| {
-                                const lower_shifted_key = try case.toLowerStr(allocator, shift_key_value);
+                                const lower_shifted_key = try letter_casing.toLowerAlloc(allocator, shift_key_value);
                                 defer allocator.free(lower_shifted_key);
 
                                 if (std.mem.eql(u8, lower_shifted_key, kv)) {
@@ -146,7 +141,7 @@ fn fillTemplate(
                         // Check not shifted key is not the same
                         if (altgr_odk_layer) |layer_value| {
                             if (layer_value.get(key)) |kv| {
-                                const lower_shifted_key = try case.toLowerStr(allocator, shift_key_value);
+                                const lower_shifted_key = try letter_casing.toLowerAlloc(allocator, shift_key_value);
                                 defer allocator.free(lower_shifted_key);
 
                                 if (std.mem.eql(u8, lower_shifted_key, kv)) {
@@ -164,7 +159,7 @@ fn fillTemplate(
             }
 
             if (key_value) |key_char| {
-                var key_char_iter = graph.iterator(key_char);
+                var key_char_iter = graphemes.iterator(key_char);
                 var key_char_len: usize = 0;
                 while (key_char_iter.next()) |_| {
                     key_char_len += 1;

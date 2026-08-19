@@ -14,15 +14,15 @@ pub const Options = struct {
 };
 
 /// Create a new TOML layout description
-pub fn run(allocator: std.mem.Allocator, options: Options, parse_options: ParseOptions) !void {
+pub fn run(allocator: std.mem.Allocator, io: std.Io, options: Options, parse_options: ParseOptions) !void {
     var file = if (std.fs.path.isAbsolute(options.output_file))
-        try std.fs.createFileAbsolute(options.output_file, .{})
+        try std.Io.Dir.createFileAbsolute(io, options.output_file, .{})
     else
-        try std.fs.cwd().createFile(options.output_file, .{});
-    defer file.close();
+        try std.Io.Dir.cwd().createFile(io, options.output_file, .{});
+    defer file.close(io);
 
     var buffer: [4 * 1024]u8 = undefined;
-    var file_writer = file.writer(&buffer);
+    var file_writer = file.writer(io, &buffer);
     const writer = &file_writer.interface;
 
     try writeDummyToml(allocator, writer, &options, parse_options);

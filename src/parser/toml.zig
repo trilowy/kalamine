@@ -9,9 +9,10 @@ const error_handling = @import("../error_handling.zig");
 const ParseOptions = error_handling.ParseOptions;
 const Diagnostic = error_handling.Diagnostic;
 const ParsingError = error_handling.ParsingError;
-const LetterCasing = @import("LetterCasing");
-const Graphemes = @import("Graphemes");
-const Grapheme = Graphemes.Grapheme;
+const zg = @import("zg");
+const letter_casing = zg.letter_casing;
+const graphemes = zg.graphemes;
+const Grapheme = graphemes.Grapheme;
 
 pub const nb_lines_per_key = 3;
 pub const nb_columns_per_key = 6;
@@ -74,17 +75,17 @@ pub fn parseKeyboardLayoutFromToml(
     if (parsed_toml.full) |full_to_parse| {
         if (options.diagnostic) |diag| diag.arg = "full";
 
-        try parseFullLayout(allocator, &keyboard_layout, full_to_parse, options);
+        try parseFullLayout(&keyboard_layout, full_to_parse, options);
 
         if (options.diagnostic) |diag| diag.arg = "";
     } else if (parsed_toml.base) |base_to_parse| {
         if (options.diagnostic) |diag| diag.arg = "base";
 
-        try parseBaseLayout(allocator, &keyboard_layout, base_to_parse, options);
+        try parseBaseLayout(&keyboard_layout, base_to_parse, options);
 
         if (parsed_toml.altgr) |altgr_to_parse| {
             if (options.diagnostic) |diag| diag.arg = "altgr";
-            try parseAltgrLayout(allocator, &keyboard_layout, altgr_to_parse, options);
+            try parseAltgrLayout(&keyboard_layout, altgr_to_parse, options);
         }
 
         if (options.diagnostic) |diag| diag.arg = "";
@@ -256,53 +257,43 @@ fn initKeyboardLayoutWithMetadata(
 
 /// Base + 1dk layers
 fn parseBaseLayout(
-    allocator: std.mem.Allocator,
     keyboard_layout: *KeyboardLayout,
     layout_to_parse: []const u8,
     options: ParseOptions,
 ) !void {
     const layers = .{ .base, .odk };
-    return parseLayout(allocator, keyboard_layout, layout_to_parse, layers, options);
+    return parseLayout(keyboard_layout, layout_to_parse, layers, options);
 }
 
 /// Base + AltGr layers
 fn parseFullLayout(
-    allocator: std.mem.Allocator,
     keyboard_layout: *KeyboardLayout,
     layout_to_parse: []const u8,
     options: ParseOptions,
 ) !void {
     const layers = .{ .base, .altgr };
-    return parseLayout(allocator, keyboard_layout, layout_to_parse, layers, options);
+    return parseLayout(keyboard_layout, layout_to_parse, layers, options);
 }
 
 /// AltGr layer only
 fn parseAltgrLayout(
-    allocator: std.mem.Allocator,
     keyboard_layout: *KeyboardLayout,
     layout_to_parse: []const u8,
     options: ParseOptions,
 ) !void {
     const layers = .{ .altgr, null };
-    return parseLayout(allocator, keyboard_layout, layout_to_parse, layers, options);
+    return parseLayout(keyboard_layout, layout_to_parse, layers, options);
 }
 
 /// Parse a layout according to the keyboard layout geometry with requested layers and put them in
 /// keyboard layout
 fn parseLayout(
-    allocator: std.mem.Allocator,
     keyboard_layout: *KeyboardLayout,
     layout_to_parse: []const u8,
     layers: struct { Layer, ?Layer },
     options: ParseOptions,
 ) !void {
     const arena = keyboard_layout.arena_allocator.allocator();
-
-    const graph = try Graphemes.init(allocator);
-    defer graph.deinit(allocator);
-
-    const case = try LetterCasing.init(allocator);
-    defer case.deinit(allocator);
 
     var base_layer: ?std.AutoHashMapUnmanaged(KeyCode, []const u8) = null;
     var base_layer_shift: ?std.AutoHashMapUnmanaged(KeyCode, []const u8) = null;
@@ -339,8 +330,8 @@ fn parseLayout(
     var layout_to_parse_column: usize = 1;
     var dead_key_in_parsing = false;
 
-    var template_iter = graph.iterator(template);
-    var layout_to_parse_iter = graph.iterator(layout_to_parse);
+    var template_iter = graphemes.iterator(template);
+    var layout_to_parse_iter = graphemes.iterator(layout_to_parse);
 
     // Skip the first empty line
     if (layout_to_parse_iter.next()) |ltpc| {
@@ -546,7 +537,7 @@ fn parseLayout(
             const key_code = entry.key_ptr;
             const key_value = entry.value_ptr;
             if (!base_layer.?.contains(key_code.*)) {
-                const key_to_put_base = try case.toLowerStr(arena, key_value.*);
+                const key_to_put_base = try letter_casing.toLowerAlloc(arena, key_value.*);
                 try base_layer.?.put(arena, key_code.*, key_to_put_base);
             }
         }
@@ -559,7 +550,7 @@ fn parseLayout(
             const key_code = entry.key_ptr;
             const key_value = entry.value_ptr;
             if (!altgr_odk_layer_shift.?.contains(key_code.*)) {
-                const key_to_put_shift = try case.toUpperStr(arena, key_value.*);
+                const key_to_put_shift = try letter_casing.toUpperAlloc(arena, key_value.*);
                 try altgr_odk_layer_shift.?.put(arena, key_code.*, key_to_put_shift);
             }
         }
