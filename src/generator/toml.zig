@@ -159,13 +159,7 @@ fn fillTemplate(
             }
 
             if (key_value) |key_char| {
-                var key_char_iter = graphemes.iterator(key_char);
-                var key_char_len: usize = 0;
-                while (key_char_iter.next()) |_| {
-                    key_char_len += 1;
-                }
-
-                if (key_char_len == 1) {
+                if (graphemes.count(key_char) == 1) {
                     try template_to_fill.append(allocator, ' ');
                 }
 
