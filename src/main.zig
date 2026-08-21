@@ -72,7 +72,14 @@ fn execute(
             // TODO: to implement
             try stdout.writeAll("watch command not yet implemented\n");
             try stdout.flush();
-            try watch.run(options); // TODO: handle error
+
+            var diag = Diagnostic{ .allocator = allocator };
+            defer diag.deinit();
+
+            watch.run(options, .{ .diagnostic = &diag }) catch |err| {
+                // TODO: maybe report error but do not crash when error reported
+                return diag.report(stdout, err);
+            };
         },
         .version => {
             try version.printTo(stdout);

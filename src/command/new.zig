@@ -7,9 +7,13 @@ const toml_parser = @import("../parser/toml.zig");
 const ParseOptions = @import("../error_handling.zig").ParseOptions;
 
 pub const Options = struct {
+    /// File to create/overwrite
     output_file: []const u8,
+    /// Specify keyboard geometry
     geometry: Geometry,
+    /// Set an AltGr layer
     altgr: bool,
+    /// Set a custom dead key
     odk: bool,
 };
 
