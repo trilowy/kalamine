@@ -189,9 +189,12 @@ fn initKeyboardLayoutWithMetadata(
     const name = if (parsed_toml.name) |name|
         try arena.dupe(u8, name)
     else {
+        // TODO: name from filename kalamine/layout.py:39
         if (options.diagnostic) |diag| diag.arg = "name";
         return ParsingError.MissingAttribute;
     };
+
+    // TODO: add extends kalamine/layout.py:41
 
     const name8 = if (parsed_toml.name8) |name8|
         try arena.dupe(u8, name8)
@@ -224,6 +227,7 @@ fn initKeyboardLayoutWithMetadata(
         null;
 
     const version = if (parsed_toml.version) |version|
+        // TODO: check if version must be controlled kalamine/layout.py:46
         try arena.dupe(u8, version)
     else
         null;

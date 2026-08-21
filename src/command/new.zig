@@ -18,7 +18,12 @@ pub const Options = struct {
 };
 
 /// Create a new TOML layout description
-pub fn run(allocator: std.mem.Allocator, io: std.Io, options: Options, parse_options: ParseOptions) !void {
+pub fn run(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    options: Options,
+    parse_options: ParseOptions,
+) !void {
     var file = if (std.fs.path.isAbsolute(options.output_file))
         try std.Io.Dir.createFileAbsolute(io, options.output_file, .{})
     else

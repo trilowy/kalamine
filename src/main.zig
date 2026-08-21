@@ -60,7 +60,7 @@ fn execute(
             var diag = Diagnostic{ .allocator = allocator };
             defer diag.deinit();
 
-            build.run(options, .{ .diagnostic = &diag }) catch |err| {
+            build.run(allocator, io, options, .{ .diagnostic = &diag }) catch |err| {
                 return diag.report(stdout, err);
             };
         },

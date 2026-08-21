@@ -33,7 +33,7 @@ pub fn printTo(writer: *std.Io.Writer, options: Options) !void {
                 \\Usage: kalamine build <file> [options]
                 \\
                 \\Options:
-                \\  --out=(all|keylayout|klc|xkb_keymap|xkb_symbols|svg)
+                \\  --out=(all|ahk|klc|keylayout|xkb_keymap|xkb_symbols|json|svg)
                 \\                      Keyboard drivers to generate, default all.
                 \\  --angle-mod         Apply angle-mod, which is a [ZXCVB] permutation with the
                 \\                      LSGT key (a.k.a. ISO key).
