@@ -10,7 +10,8 @@ const std = @import("std");
 const layout = @import("../layout.zig");
 const KeyboardLayout = layout.KeyboardLayout;
 const Layer = layout.Layer;
-// const KeyCode = layout.KeyCode;
+const KeyCode = layout.KeyCode;
+const windows = @import("windows.zig");
 
 pub fn writeLayout(
     writer: *std.Io.Writer,
@@ -37,13 +38,31 @@ fn writeLayer(
     keyboard_layout: *const KeyboardLayout,
     layer: Layer,
 ) !void {
-    // TODO: kalamine/generators/ahk.py:18
     // TODO: maybe a specific enum for base/altgr/ctrl/altgr?
-    if (layer == .base) {
-        try writer.writeAll("KALAMINE::LAYOUT\n"); // TODO:
-    } else {
-        try writer.writeAll("KALAMINE::ALTGR\n"); // TODO:
+    for (std.enums.values(KeyCode)) |key_name| {
+        switch (key_name) {
+            .ae01 => try writer.writeAll("; Digits\n"),
+            .ad01 => try writer.writeAll("; Letters, first row\n"),
+            .ac01 => try writer.writeAll("; Letters, second row\n"),
+            .ab01 => try writer.writeAll("; Letters, third row\n"),
+            .ae11 => try writer.writeAll("; Pinky keys\n"),
+            .spce => try writer.writeAll("; Space bar\n"),
+            // FIXME: ABNT / JIS keys: these two keys are not supported yet by kalamine
+            .ae13, .ab11 => continue,
+            else => {},
+        }
+
+        const sc = windows.scancode(key_name);
+
+        // TODO: kalamine/generators/ahk.py:51
+        _ = sc;
+        // if (layer == .base) {
+        //     try writer.writeAll("KALAMINE::LAYOUT\n"); // TODO:
+        // } else {
+        //     try writer.writeAll("KALAMINE::ALTGR\n"); // TODO:
+        // }
     }
+    _ = layer;
     _ = keyboard_layout;
 }
 
