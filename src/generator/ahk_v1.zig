@@ -92,10 +92,15 @@ fn writeKey(
         _ = sym;
         // TODO: kalamine/generators/ahk.py:59
         // if symbol == dead key
-        // FIXME: symbol unicode instead of symbol[0]
-        var iter: zg.code_point.Iterator = .init(symbol);
-        const cp = iter.next().?;
-        try writer.print("{s}SC{s}::SendKey(\"U+{x:0>4}\", ) ; {s}\n", .{ prefix, sc, cp.code, symbol });
+
+        var it = std.unicode.Utf8Iterator{
+            .bytes = symbol,
+            .i = 0,
+        };
+
+        const codepoint = it.nextCodepoint() orelse return;
+
+        try writer.print("{s}SC{s}::SendKey(\"U+{x:0>4}\", ) ; {s}\n", .{ prefix, sc, codepoint, symbol });
     }
 }
 
