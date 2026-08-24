@@ -2,10 +2,9 @@
 //! To be used by AutoHotKey v1.1: https://autohotkey.com
 
 const std = @import("std");
+const zg = @import("zg");
+const graphemes = zg.graphemes;
 // TODO:
-// const zg = @import("zg");
-// const letter_casing = zg.letter_casing;
-// const graphemes = zg.graphemes;
 // const Grapheme = graphemes.Grapheme;
 const layout = @import("../layout.zig");
 const KeyboardLayout = layout.KeyboardLayout;
@@ -36,17 +35,35 @@ pub fn writeLayout(
 fn writeLayer(
     writer: *std.Io.Writer,
     keyboard_layout: *const KeyboardLayout,
+    // TODO: maybe a specific enum for base/altgr/ctrl/altgr?
     layer: Layer,
 ) !void {
-    // TODO: maybe a specific enum for base/altgr/ctrl/altgr?
+    const base_layer, const shift_layer, const base_prefix, const shift_prefix =
+        if (layer == .base)
+            .{
+                keyboard_layout.layers.get(.base).?,
+                keyboard_layout.layers.get(.shift).?,
+                " ",
+                "+",
+            }
+        else if (!keyboard_layout.layers.contains(.altgr))
+            return
+        else
+            .{
+                keyboard_layout.layers.get(.altgr).?,
+                keyboard_layout.layers.get(.altgr_shift).?,
+                " <^>!",
+                "<^>!+",
+            };
+
     for (std.enums.values(KeyCode)) |key_name| {
         switch (key_name) {
-            .ae01 => try writer.writeAll("; Digits\n"),
-            .ad01 => try writer.writeAll("; Letters, first row\n"),
-            .ac01 => try writer.writeAll("; Letters, second row\n"),
-            .ab01 => try writer.writeAll("; Letters, third row\n"),
-            .ae11 => try writer.writeAll("; Pinky keys\n"),
-            .spce => try writer.writeAll("; Space bar\n"),
+            .ae01 => try writer.writeAll("; Digits\n\n"),
+            .ad01 => try writer.writeAll("; Letters, first row\n\n"),
+            .ac01 => try writer.writeAll("; Letters, second row\n\n"),
+            .ab01 => try writer.writeAll("; Letters, third row\n\n"),
+            .ae11 => try writer.writeAll("; Pinky keys\n\n"),
+            .spce => try writer.writeAll("; Space bar\n\n"),
             // FIXME: ABNT / JIS keys: these two keys are not supported yet by kalamine
             .ae13, .ab11 => continue,
             else => {},
@@ -54,16 +71,38 @@ fn writeLayer(
 
         const sc = windows.scancode(key_name);
 
-        // TODO: kalamine/generators/ahk.py:51
-        _ = sc;
-        // if (layer == .base) {
-        //     try writer.writeAll("KALAMINE::LAYOUT\n"); // TODO:
-        // } else {
-        //     try writer.writeAll("KALAMINE::ALTGR\n"); // TODO:
-        // }
+        try writeKey(writer, key_name, sc, base_prefix, base_layer);
+        try writeKey(writer, key_name, sc, shift_prefix, shift_layer);
+        try writer.writeAll("\n"); // TODO: too many spaces
+
+        // TODO: kalamine/generators/ahk.py:59
+        // TODO: big refactor to do with unshifted/shifted in the same layer
     }
-    _ = layer;
-    _ = keyboard_layout;
+}
+
+fn writeKey(
+    writer: *std.Io.Writer,
+    key_name: KeyCode,
+    sc: []const u8,
+    prefix: []const u8,
+    layer: std.AutoHashMapUnmanaged(KeyCode, []const u8),
+) !void {
+    if (layer.get(key_name)) |symbol| {
+        const sym = ahkEscape(symbol);
+        _ = sym;
+        // TODO: kalamine/generators/ahk.py:59
+        // if symbol == dead key
+        // FIXME: symbol unicode instead of symbol[0]
+        var iter: zg.code_point.Iterator = .init(symbol);
+        const cp = iter.next().?;
+        try writer.print("{s}SC{s}::SendKey(\"U+{x:0>4}\", ) ; {s}\n", .{ prefix, sc, cp.code, symbol });
+    }
+}
+
+fn ahkEscape(key: []const u8) void {
+    if (graphemes.count(key) == 1) {
+        // TODO:
+    }
 }
 
 const ahk_v1_header_1 =
