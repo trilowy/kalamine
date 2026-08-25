@@ -93,10 +93,8 @@ fn writeKey(
         // TODO: kalamine/generators/ahk.py:59
         // if symbol == dead key
 
-        var it = std.unicode.Utf8Iterator{
-            .bytes = symbol,
-            .i = 0,
-        };
+        const utf8_view = try std.unicode.Utf8View.init(symbol);
+        var it = utf8_view.iterator();
         const codepoint = it.nextCodepoint() orelse return;
 
         // TODO: actions/dead keys in JSON
