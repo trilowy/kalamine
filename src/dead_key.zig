@@ -1,0 +1,195 @@
+//! The dead keys below are used by the macOS and Windows drivers. In order to
+//! work with the Linux driver, their name must match the XKB definition:
+//! 'acute' <=> dead_acute, 'grave' <=> dead_grave, etc.
+//! https://help.ubuntu.com/community/GtkDeadKeyTable
+//!
+//! The only exception is the '1dk' key, which is:
+//!   - a standard dead key for the macOS and Windows drivers;
+//!   - a dead level key  for the Linux driver:
+//!     - ISO_Level3_Latch if the layout has no AltGr layer
+//!     - ISO_Level5_Latch if the layout uses an AltGr key (= ISO_Level3_Shift).
+//!
+//! All other dead keys have been grep’ed from my Ubuntu 18.04LTS box,
+//! excluding multiple diacritic combinations and combining characters.
+//! /usr/share/X11/locale/en_US.UTF-8/Compose
+
+// TODO: see what fields are useful and if the type can be improved
+pub const DeadKey = struct {
+    char: []const u8,
+    name: []const u8,
+    base: []const u8,
+    alt: []const u8,
+    alt_space: []const u8,
+    alt_self: []const u8,
+};
+
+pub const dead_keys = [_]DeadKey{
+    .{
+        .char = "**",
+        .name = "1dk",
+        .base = "", // computed from the imported layout
+        .alt = "", // computed from the imported layout
+        .alt_space = "'", // apostrophe (can be overriden by the `space.1dk` key)
+        .alt_self = "'", // apostrophe (can be overriden from the imported layout)
+    },
+    .{
+        .char = "*`",
+        .name = "grave",
+        .base = "AaEeIiNnOoUuWwYyЕеИи",
+        .alt = "ÀàÈèÌìǸǹÒòÙùẀẁỲỳЀѐЍѝ",
+        .alt_space = "`", // U+0060 GRAVE ACCENT
+        .alt_self = "`", // U+0060 GRAVE ACCENT
+    },
+    .{
+        .char = "*‟", // there’s no “double grave accent” Unicode character :(
+        .name = "doublegrave",
+        .base = "AaEeIiOoRrUuѴѴ",
+        .alt = "ȀȁȄȅȈȉȌȍȐȑȔȕѶѷ",
+        .alt_space = "‟", // U+201F HIGH REVERSED-9 QUOTATION MARK
+        .alt_self = "‟", // U+201F HIGH REVERSED-9 QUOTATION MARK
+    },
+    .{
+        .char = "*´",
+        .name = "acute",
+        .base = "AaCcEeGgIiKkLlMmNnOoPpRrSsUuWwYyZzΑαΕεΗηΙιΟοΥυΩωГгКк",
+        .alt = "ÁáĆćÉéǴǵÍíḰḱĹĺḾḿŃńÓóṔṕŔŕŚśÚúẂẃÝýŹźΆάΈέΉήΊίΌόΎύΏώЃѓЌќ",
+        .alt_space = "'", // U+0027 APOSTROPHE
+        .alt_self = "´", // U+00B4 ACUTE ACCENT
+    },
+    .{
+        .char = "*”", // for the symmetry with the doublegrave ID
+        .name = "doubleacute",
+        .base = "OoUuУу",
+        .alt = "ŐőŰűӲӳ",
+        .alt_space = "”", // U+201D RIGHT DOUBLE QUOTATION MARK
+        .alt_self = "˝", // U+02DD DOUBLE ACUTE ACCENT
+    },
+    .{
+        .char = "*^",
+        .name = "circumflex",
+        .base = "AaCcEeGgHhIiJjOoSsUuWwYyZz0123456789()+-=",
+        .alt = "ÂâĈĉÊêĜĝĤĥÎîĴĵÔôŜŝÛûŴŵŶŷẐẑ⁰¹²³⁴⁵⁶⁷⁸⁹⁽⁾⁺⁻⁼",
+        .alt_space = "^", // U+005E CIRCUMFLEX ACCENT
+        .alt_self = "^", // U+005E CIRCUMFLEX ACCENT
+    },
+    .{
+        .char = "*ˇ",
+        .name = "caron",
+        .base = "AaCcDdEeGgHhIiKkLlNnOoRrSsTtUuZzƷʒ0123456789()+-=",
+        .alt = "ǍǎČčĎďĚěǦǧȞȟǏǐǨǩĽľŇňǑǒŘřŠšŤťǓǔŽžǮǯ₀₁₂₃₄₅₆₇₈₉₍₎₊₋₌",
+        .alt_space = "ˇ", // U+02C7 CARON
+        .alt_self = "ˇ", // U+02C7 CARON
+    },
+    .{
+        .char = "*˘",
+        .name = "breve",
+        .base = "AaEeGgIiOoUuΑαΙιΥυАаЕеЖжИиУу",
+        .alt = "ĂăĔĕĞğĬĭŎŏŬŭᾸᾰῘῐῨῠӐӑӖӗӁӂЙйЎў",
+        .alt_space = "˘", // U+02D8 BREVE
+        .alt_self = "˘", // U+02D8 BREVE
+    },
+    .{
+        .char = "*⁻",
+        .name = "invertedbreve",
+        .base = "AaEeIiOoUuRr",
+        .alt = "ȂȃȆȇȊȋȎȏȖȗȒȓ",
+        .alt_space = "˘", // U+02D8 BREVE
+        .alt_self = "˘", // U+02D8 BREVE
+    },
+    .{
+        .char = "*~",
+        .name = "tilde",
+        .base = "AaEeIiNnOoUuVvYy<>=",
+        .alt = "ÃãẼẽĨĩÑñÕõŨũṼṽỸỹ≲≳≃",
+        .alt_space = "~", // U+007E TILDE
+        .alt_self = "~", // U+007E TILDE
+    },
+    .{
+        .char = "*¯",
+        .name = "macron",
+        .base = "AaÆæEeGgIiOoUuYy",
+        .alt = "ĀāǢǣĒēḠḡĪīŌōŪūȲȳ",
+        .alt_space = "¯", // U+00AF MACRON
+        .alt_self = "ˉ", // U+02C9 MODIFIER LETTER MACRON
+    },
+    .{
+        .char = "*¨",
+        .name = "diaeresis",
+        .base = "AaEeHhIiOotUuWwXxYyΙιΥυАаЕеӘәЖжЗзИиІіОоӨөУуЧчЫыЭэ",
+        .alt = "ÄäËëḦḧÏïÖöẗÜüẄẅẌẍŸÿΪϊΫϋӒӓЁёӚӛӜӝӞӟӤӥЇїӦӧӪӫӰӱӴӵӸӹӬӭ",
+        .alt_space = "\"", // U+0022 QUOTATION MARK
+        .alt_self = "¨", // U+00A8 DIAERESIS
+    },
+    .{
+        .char = "*˚",
+        .name = "abovering",
+        .base = "AaUuwy",
+        .alt = "ÅåŮůẘẙ",
+        .alt_space = "˚", // U+02DA RING ABOVE
+        .alt_self = "˚", // U+02DA RING ABOVE
+    },
+    .{
+        .char = "*¸",
+        .name = "cedilla",
+        .base = "CcDdEeGgHhKkLlNnRrSsTt",
+        .alt = "ÇçḐḑȨȩĢģḨḩĶķĻļŅņŖŗŞşŢţ",
+        .alt_space = "¸", // U+00B8 CEDILLA
+        .alt_self = "¸", // U+00B8 CEDILLA
+    },
+    .{
+        .char = "*,",
+        .name = "belowcomma",
+        .base = "SsTt",
+        .alt = "ȘșȚț",
+        .alt_space = ",", // U+002C COMMA
+        .alt_self = ",", // U+002C COMMA
+    },
+    .{
+        .char = "*˛",
+        .name = "ogonek",
+        .base = "AaEeIiOoUu",
+        .alt = "ĄąĘęĮįǪǫŲų",
+        .alt_space = "˛", // U+02DB OGONEK
+        .alt_self = "˛", // U+02DB OGONEK
+    },
+    .{
+        .char = "*/",
+        .name = "stroke",
+        .base = "AaBbCcDdEeGgHhIiJjLlOoPpRrTtUuYyZz<≤≥>=",
+        .alt = "ȺⱥɃƀȻȼĐđɆɇǤǥĦħƗɨɈɉŁłØøⱣᵽɌɍŦŧɄʉɎɏƵƶ≮≰≱≯≠",
+        .alt_space = "/", // U+002F SOLIDUS
+        .alt_self = "/", // U+002F SOLIDUS
+    },
+    .{
+        .char = "*˙",
+        .name = "abovedot",
+        .base = "AaBbCcDdEeFfGgHhIijLlMmNnOoPpRrSsTtWwXxYyZz",
+        .alt = "ȦȧḂḃĊċḊḋĖėḞḟĠġḢḣİıȷĿŀṀṁṄṅȮȯṖṗṘṙṠṡṪṫẆẇẊẋẎẏŻż",
+        .alt_space = "˙", // U+02D9 DOT ABOVE
+        .alt_self = "˙", // U+02D9 DOT ABOVE
+    },
+    .{
+        .char = "*.",
+        .name = "belowdot",
+        .base = "AaBbDdEeHhIiKkLlMmNnOoRrSsTtUuVvWwYyZz",
+        .alt = "ẠạḄḅḌḍẸẹḤḥỊịḲḳḶḷṂṃṆṇỌọṚṛṢṣṬṭỤụṾṿẈẉỴỵẒẓ",
+        .alt_space = ".", // U+002E FULL STOP
+        .alt_self = ".", // U+002E FULL STOP
+    },
+    .{
+        .char = "*µ",
+        .name = "greek",
+        .base = "AaBbDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuWwXxYyZz",
+        .alt = "ΑαΒβΔδΕεΦφΓγΗηΙιΘθΚκΛλΜμΝνΟοΠπΧχΡρΣσΤτΥυΩωΞξΨψΖζ",
+        .alt_space = "µ", // U+00B5 MICRO SIGN
+        .alt_self = "µ", // U+00B5 MICRO SIGN
+    },
+    .{
+        .char = "*¤",
+        .name = "currency",
+        .base = "AaBbÇCçcDdEeFfGgHhIiKkLlMmNnOoPpRrSsTtþÞUuWwYy",
+        .alt = "₳؋₱฿₵₡₵¢₯₫₠€₣ƒ₲₲₴₴៛﷼₭₭₤£ℳ₥₦₦૱௹₧₰₨₢$₪₮৳৲৲圓元₩₩円¥",
+        .alt_space = "¤", // U+00A4 CURRENCY SIGN
+        .alt_self = "¤", // U+00A4 CURRENCY SIGN
+    },
+};

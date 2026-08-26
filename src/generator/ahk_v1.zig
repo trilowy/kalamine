@@ -98,6 +98,7 @@ fn writeKey(
         const codepoint = it.nextCodepoint() orelse return;
 
         // TODO: actions/dead keys in JSON
+        // TODO: time to do kalamine/layout.py:222 in parser/toml.zig
         try writer.print(
             "{s}SC{s}::SendKey(\"U+{x:0>4}\", {{}}) ; {s}\n",
             .{ prefix, sc, codepoint, symbol },
