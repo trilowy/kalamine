@@ -98,7 +98,10 @@ fn writeKey(
         const codepoint = it.nextCodepoint() orelse return;
 
         // TODO: actions/dead keys in JSON
-        try writer.print("{s}SC{s}::SendKey(\"U+{x:0>4}\", {{}}) ; {s}\n", .{ prefix, sc, codepoint, symbol });
+        try writer.print(
+            "{s}SC{s}::SendKey(\"U+{x:0>4}\", {{}}) ; {s}\n",
+            .{ prefix, sc, codepoint, symbol },
+        );
     }
 }
 
